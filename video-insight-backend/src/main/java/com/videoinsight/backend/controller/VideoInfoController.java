@@ -10,8 +10,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -27,6 +29,12 @@ public class VideoInfoController {
         return ApiResponse.success(videoInfoService.createVideo(request));
     }
 
+    @PostMapping("/upload")
+    public ApiResponse<VideoInfo> uploadVideo(@RequestParam("file") MultipartFile file,
+                                              @RequestParam(value = "title", required = false) String title) {
+        return ApiResponse.success(videoInfoService.uploadVideo(file, title));
+    }
+
     @GetMapping
     public ApiResponse<List<VideoInfo>> listVideos() {
         return ApiResponse.success(videoInfoService.listVideos());
@@ -35,5 +43,10 @@ public class VideoInfoController {
     @GetMapping("/{id}")
     public ApiResponse<VideoInfo> getVideoDetail(@PathVariable Long id) {
         return ApiResponse.success(videoInfoService.getVideoDetail(id));
+    }
+
+    @PostMapping("/{id}/analyze")
+    public ApiResponse<VideoInfo> analyzeVideo(@PathVariable Long id) {
+        return ApiResponse.success(videoInfoService.analyzeVideo(id));
     }
 }
