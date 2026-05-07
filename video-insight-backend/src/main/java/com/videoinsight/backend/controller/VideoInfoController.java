@@ -4,6 +4,9 @@ import com.videoinsight.backend.common.ApiResponse;
 import com.videoinsight.backend.entity.VideoInfo;
 import com.videoinsight.backend.model.request.VideoCreateRequest;
 import com.videoinsight.backend.service.VideoInfoService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,33 +23,39 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/videos")
 @RequiredArgsConstructor
+@Tag(name = "Videos", description = "Video records, local upload, and analysis workflow")
 public class VideoInfoController {
 
     private final VideoInfoService videoInfoService;
 
     @PostMapping
+    @Operation(summary = "Create video by URL", description = "Creates a video record from an external video URL.")
     public ApiResponse<VideoInfo> createVideo(@Valid @RequestBody VideoCreateRequest request) {
         return ApiResponse.success(videoInfoService.createVideo(request));
     }
 
     @PostMapping("/upload")
-    public ApiResponse<VideoInfo> uploadVideo(@RequestParam("file") MultipartFile file,
-                                              @RequestParam(value = "title", required = false) String title) {
+    @Operation(summary = "Upload local video", description = "Uploads a local video file and creates a video record.")
+    public ApiResponse<VideoInfo> uploadVideo(@Parameter(description = "Local video file") @RequestParam("file") MultipartFile file,
+                                              @Parameter(description = "Optional video title") @RequestParam(value = "title", required = false) String title) {
         return ApiResponse.success(videoInfoService.uploadVideo(file, title));
     }
 
     @GetMapping
+    @Operation(summary = "List videos", description = "Returns all video records ordered by creation time descending.")
     public ApiResponse<List<VideoInfo>> listVideos() {
         return ApiResponse.success(videoInfoService.listVideos());
     }
 
     @GetMapping("/{id}")
-    public ApiResponse<VideoInfo> getVideoDetail(@PathVariable Long id) {
+    @Operation(summary = "Get video detail", description = "Returns one video record by id.")
+    public ApiResponse<VideoInfo> getVideoDetail(@Parameter(description = "Video id") @PathVariable Long id) {
         return ApiResponse.success(videoInfoService.getVideoDetail(id));
     }
 
     @PostMapping("/{id}/analyze")
-    public ApiResponse<VideoInfo> analyzeVideo(@PathVariable Long id) {
+    @Operation(summary = "Analyze video", description = "Runs the video analysis workflow. The current implementation writes a simulated analysis result.")
+    public ApiResponse<VideoInfo> analyzeVideo(@Parameter(description = "Video id") @PathVariable Long id) {
         return ApiResponse.success(videoInfoService.analyzeVideo(id));
     }
 }
