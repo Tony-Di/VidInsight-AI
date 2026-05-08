@@ -11,22 +11,13 @@ import com.videoinsight.backend.mapper.VideoUploadTaskMapper;
 import com.videoinsight.backend.model.request.ChunkUploadInitRequest;
 import com.videoinsight.backend.model.response.ChunkUploadInitResponse;
 import com.videoinsight.backend.model.response.ChunkUploadResponse;
+import com.videoinsight.backend.service.FileStorageService;
 import com.videoinsight.backend.service.VideoUploadTaskService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
-import java.util.Comparator;
-import java.util.Locale;
-import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -34,19 +25,13 @@ import java.util.UUID;
 public class VideoUploadTaskServiceImpl extends ServiceImpl<VideoUploadTaskMapper, VideoUploadTask>
         implements VideoUploadTaskService {
 
-    private static final Set<String> ALLOWED_EXTENSIONS = Set.of(".mp4", ".mov", ".avi", ".mkv", ".webm");
-
     private final VideoInfoMapper videoInfoMapper;
 
-    @Value("${app.upload.chunk-dir}")
-    private String chunkDir;
-
-    @Value("${app.upload.video-dir}")
-    private String videoDir;
+    private final FileStorageService fileStorageService;
 
     @Override
     public ChunkUploadInitResponse initChunkUpload(ChunkUploadInitRequest request) {
-        validateVideoExtension(request.getFileName());
+        fileStorageService.validateVideoFilename(request.getFileName());
 
         LocalDateTime now = LocalDateTime.now();
         String uploadId = UUID.randomUUID().toString();
@@ -90,7 +75,7 @@ public class VideoUploadTaskServiceImpl extends ServiceImpl<VideoUploadTaskMappe
             throw new IllegalArgumentException("chunkIndex is out of range");
         }
 
-        boolean alreadyUploaded = saveChunkFile(uploadId, chunkIndex, file);
+        boolean alreadyUploaded = fileStorageService.saveChunk(uploadId, chunkIndex, file);
         if (!alreadyUploaded) {
             uploadTask.setUploadedChunks(uploadTask.getUploadedChunks() + 1);
         }
@@ -120,80 +105,27 @@ public class VideoUploadTaskServiceImpl extends ServiceImpl<VideoUploadTaskMappe
             throw new BusinessException(400, "upload task is not uploading");
         }
 
-        Path uploadPath = getUploadChunkPath(uploadId);
-        ensureAllChunksExist(uploadTask, uploadPath);
-
-        String extension = getExtension(uploadTask.getFileName());
-        String storedFilename = UUID.randomUUID() + extension;
-        Path videoRootPath = Path.of(videoDir).toAbsolutePath().normalize();
-        Path targetPath = videoRootPath.resolve(storedFilename).normalize();
-        if (!targetPath.startsWith(videoRootPath)) {
-            throw new IllegalArgumentException("invalid video path");
-        }
-
         try {
-            Files.createDirectories(videoRootPath);
-            mergeChunks(uploadTask, uploadPath, targetPath);
-            VideoInfo videoInfo = createVideoInfo(uploadTask, "/uploads/videos/" + storedFilename);
+            String sourceUrl = fileStorageService.mergeChunks(
+                    uploadTask.getUploadId(),
+                    uploadTask.getFileName(),
+                    uploadTask.getTotalChunks()
+            );
+            VideoInfo videoInfo = createVideoInfo(uploadTask, sourceUrl);
 
             uploadTask.setStatus(UploadTaskStatus.COMPLETED);
             uploadTask.setUpdatedAt(LocalDateTime.now());
             updateById(uploadTask);
 
-            deleteDirectory(uploadPath);
+            fileStorageService.deleteChunks(uploadTask.getUploadId());
             return videoInfo;
-        } catch (IOException exception) {
+        } catch (IllegalArgumentException exception) {
+            throw exception;
+        } catch (Exception exception) {
             uploadTask.setStatus(UploadTaskStatus.FAILED);
             uploadTask.setUpdatedAt(LocalDateTime.now());
             updateById(uploadTask);
             throw new IllegalStateException("failed to complete chunk upload", exception);
-        }
-    }
-
-    private boolean saveChunkFile(String uploadId, Integer chunkIndex, MultipartFile file) {
-        Path uploadPath = getUploadChunkPath(uploadId);
-        Path targetPath = uploadPath.resolve(chunkIndex + ".part").normalize();
-
-        if (!targetPath.startsWith(uploadPath)) {
-            throw new IllegalArgumentException("invalid chunk path");
-        }
-
-        try {
-            Files.createDirectories(uploadPath);
-            boolean alreadyUploaded = Files.exists(targetPath);
-            try (InputStream inputStream = file.getInputStream()) {
-                Files.copy(inputStream, targetPath, StandardCopyOption.REPLACE_EXISTING);
-            }
-            return alreadyUploaded;
-        } catch (IOException exception) {
-            throw new IllegalStateException("failed to save chunk file", exception);
-        }
-    }
-
-    private Path getUploadChunkPath(String uploadId) {
-        Path chunkRootPath = Path.of(chunkDir).toAbsolutePath().normalize();
-        Path uploadPath = chunkRootPath.resolve(uploadId).normalize();
-        if (!uploadPath.startsWith(chunkRootPath)) {
-            throw new IllegalArgumentException("invalid upload path");
-        }
-        return uploadPath;
-    }
-
-    private void ensureAllChunksExist(VideoUploadTask uploadTask, Path uploadPath) {
-        for (int i = 0; i < uploadTask.getTotalChunks(); i++) {
-            Path chunkPath = uploadPath.resolve(i + ".part").normalize();
-            if (!chunkPath.startsWith(uploadPath) || !Files.exists(chunkPath)) {
-                throw new BusinessException(400, "chunk " + i + " is missing");
-            }
-        }
-    }
-
-    private void mergeChunks(VideoUploadTask uploadTask, Path uploadPath, Path targetPath) throws IOException {
-        try (OutputStream outputStream = Files.newOutputStream(targetPath)) {
-            for (int i = 0; i < uploadTask.getTotalChunks(); i++) {
-                Path chunkPath = uploadPath.resolve(i + ".part").normalize();
-                Files.copy(chunkPath, outputStream);
-            }
         }
     }
 
@@ -209,39 +141,5 @@ public class VideoUploadTaskServiceImpl extends ServiceImpl<VideoUploadTaskMappe
 
         videoInfoMapper.insert(videoInfo);
         return videoInfo;
-    }
-
-    private void deleteDirectory(Path directory) throws IOException {
-        if (!Files.exists(directory)) {
-            return;
-        }
-        try (var paths = Files.walk(directory)) {
-            paths.sorted(Comparator.reverseOrder())
-                    .forEach(path -> {
-                        try {
-                            Files.deleteIfExists(path);
-                        } catch (IOException exception) {
-                            throw new IllegalStateException("failed to delete chunk file", exception);
-                        }
-                    });
-        }
-    }
-
-    private void validateVideoExtension(String filename) {
-        String extension = getExtension(filename);
-        if (!ALLOWED_EXTENSIONS.contains(extension)) {
-            throw new IllegalArgumentException("unsupported video file type");
-        }
-    }
-
-    private String getExtension(String filename) {
-        if (filename == null) {
-            return "";
-        }
-        int dotIndex = filename.lastIndexOf('.');
-        if (dotIndex < 0) {
-            return "";
-        }
-        return filename.substring(dotIndex).toLowerCase(Locale.ROOT);
     }
 }
