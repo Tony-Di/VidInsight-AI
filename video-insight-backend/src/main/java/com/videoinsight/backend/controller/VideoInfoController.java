@@ -54,7 +54,7 @@ public class VideoInfoController {
     }
 
     @PostMapping("/{id}/analyze")
-    @Operation(summary = "Analyze video", description = "Runs the video analysis workflow. The current implementation writes a simulated analysis result.")
+    @Operation(summary = "Submit video analysis task", description = "Marks the video as PROCESSING and submits the analysis task to a background thread pool.")
     public ApiResponse<VideoInfo> analyzeVideo(@Parameter(description = "Video id") @PathVariable Long id) {
         return ApiResponse.success(videoInfoService.analyzeVideo(id));
     }

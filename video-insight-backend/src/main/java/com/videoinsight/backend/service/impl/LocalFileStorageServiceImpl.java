@@ -22,12 +22,16 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
 
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(".mp4", ".mov", ".avi", ".mkv", ".webm");
     private static final String VIDEO_URL_PREFIX = "/uploads/videos/";
+    private static final String AUDIO_URL_PREFIX = "/uploads/audio/";
 
     @Value("${app.upload.video-dir}")
     private String videoDir;
 
     @Value("${app.upload.chunk-dir}")
     private String chunkDir;
+
+    @Value("${app.upload.audio-dir}")
+    private String audioDir;
 
     @Override
     public String saveVideo(MultipartFile file) {
@@ -144,20 +148,32 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
 
     @Override
     public Path resolveLocalPath(String sourceUrl) {
-        if (sourceUrl == null || !sourceUrl.startsWith(VIDEO_URL_PREFIX)) {
-            throw new IllegalArgumentException("only local uploaded videos are supported");
+        if (sourceUrl == null) {
+            throw new IllegalArgumentException("sourceUrl is required");
         }
 
-        String filename = sourceUrl.substring(VIDEO_URL_PREFIX.length());
-        Path videoRootPath = Path.of(videoDir).toAbsolutePath().normalize();
-        Path videoPath = videoRootPath.resolve(filename).normalize();
-        if (!videoPath.startsWith(videoRootPath)) {
-            throw new IllegalArgumentException("invalid video source path");
+        if (sourceUrl.startsWith(VIDEO_URL_PREFIX)) {
+            return resolveLocalPath(sourceUrl, VIDEO_URL_PREFIX, videoDir, "video file does not exist");
         }
-        if (!Files.exists(videoPath)) {
-            throw new IllegalArgumentException("video file does not exist");
+
+        if (sourceUrl.startsWith(AUDIO_URL_PREFIX)) {
+            return resolveLocalPath(sourceUrl, AUDIO_URL_PREFIX, audioDir, "audio file does not exist");
         }
-        return videoPath;
+
+        throw new IllegalArgumentException("only local uploaded files are supported");
+    }
+
+    private Path resolveLocalPath(String sourceUrl, String urlPrefix, String rootDir, String missingMessage) {
+        String filename = sourceUrl.substring(urlPrefix.length());
+        Path rootPath = Path.of(rootDir).toAbsolutePath().normalize();
+        Path filePath = rootPath.resolve(filename).normalize();
+        if (!filePath.startsWith(rootPath)) {
+            throw new IllegalArgumentException("invalid source path");
+        }
+        if (!Files.exists(filePath)) {
+            throw new IllegalArgumentException(missingMessage);
+        }
+        return filePath;
     }
 
     private Path getUploadChunkPath(String uploadId) {

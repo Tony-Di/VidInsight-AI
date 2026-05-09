@@ -7,7 +7,7 @@ import com.videoinsight.backend.exception.BusinessException;
 import com.videoinsight.backend.mapper.VideoInfoMapper;
 import com.videoinsight.backend.model.request.VideoCreateRequest;
 import com.videoinsight.backend.service.FileStorageService;
-import com.videoinsight.backend.service.VideoAnalysisService;
+import com.videoinsight.backend.service.VideoAnalysisTaskService;
 import com.videoinsight.backend.service.VideoInfoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -23,7 +23,7 @@ public class VideoInfoServiceImpl extends ServiceImpl<VideoInfoMapper, VideoInfo
 
     private final FileStorageService fileStorageService;
 
-    private final VideoAnalysisService videoAnalysisService;
+    private final VideoAnalysisTaskService videoAnalysisTaskService;
 
     @Override
     public VideoInfo createVideo(VideoCreateRequest request) {
@@ -84,19 +84,7 @@ public class VideoInfoServiceImpl extends ServiceImpl<VideoInfoMapper, VideoInfo
         videoInfo.setUpdatedAt(LocalDateTime.now());
         updateById(videoInfo);
 
-        try {
-            String summary = videoAnalysisService.analyze(videoInfo);
-            videoInfo.setVideoStatus(VideoStatus.COMPLETED);
-            videoInfo.setSummary(summary);
-            videoInfo.setUpdatedAt(LocalDateTime.now());
-            updateById(videoInfo);
-        } catch (Exception exception) {
-            videoInfo.setVideoStatus(VideoStatus.FAILED);
-            videoInfo.setSummary(exception.getMessage());
-            videoInfo.setUpdatedAt(LocalDateTime.now());
-            updateById(videoInfo);
-            throw exception;
-        }
+        videoAnalysisTaskService.submitAnalysis(videoInfo.getId());
 
         return videoInfo;
     }
