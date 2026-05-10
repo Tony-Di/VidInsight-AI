@@ -11,9 +11,11 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -32,11 +34,11 @@ public class VideoUploadController {
         return ApiResponse.success(videoUploadTaskService.initChunkUpload(request));
     }
 
-    @PostMapping("/upload")
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Upload one chunk", description = "Uploads one chunk file for an existing upload task.")
     public ApiResponse<ChunkUploadResponse> uploadChunk(@Parameter(description = "Upload task id returned by init") @RequestParam("uploadId") String uploadId,
                                                         @Parameter(description = "Chunk index starting from 0") @RequestParam("chunkIndex") Integer chunkIndex,
-                                                        @Parameter(description = "Chunk file content") @RequestParam("file") MultipartFile file) {
+                                                        @Parameter(description = "Chunk file content") @RequestPart("file") MultipartFile file) {
         return ApiResponse.success(videoUploadTaskService.uploadChunk(uploadId, chunkIndex, file));
     }
 

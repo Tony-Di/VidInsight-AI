@@ -9,11 +9,13 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -34,9 +36,9 @@ public class VideoInfoController {
         return ApiResponse.success(videoInfoService.createVideo(request));
     }
 
-    @PostMapping("/upload")
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Upload local video", description = "Uploads a local video file and creates a video record.")
-    public ApiResponse<VideoInfo> uploadVideo(@Parameter(description = "Local video file") @RequestParam("file") MultipartFile file,
+    public ApiResponse<VideoInfo> uploadVideo(@Parameter(description = "Local video file") @RequestPart("file") MultipartFile file,
                                               @Parameter(description = "Optional video title") @RequestParam(value = "title", required = false) String title) {
         return ApiResponse.success(videoInfoService.uploadVideo(file, title));
     }

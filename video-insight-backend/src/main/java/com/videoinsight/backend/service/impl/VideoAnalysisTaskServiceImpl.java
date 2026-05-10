@@ -3,6 +3,7 @@ package com.videoinsight.backend.service.impl;
 import com.videoinsight.backend.entity.VideoInfo;
 import com.videoinsight.backend.enums.VideoStatus;
 import com.videoinsight.backend.mapper.VideoInfoMapper;
+import com.videoinsight.backend.model.response.VideoAnalysisResult;
 import com.videoinsight.backend.service.VideoAnalysisService;
 import com.videoinsight.backend.service.VideoAnalysisTaskService;
 import lombok.RequiredArgsConstructor;
@@ -31,17 +32,34 @@ public class VideoAnalysisTaskServiceImpl implements VideoAnalysisTaskService {
         }
 
         try {
-            String summary = videoAnalysisService.analyze(videoInfo);
+            VideoAnalysisResult result = videoAnalysisService.analyze(videoInfo);
             videoInfo.setVideoStatus(VideoStatus.COMPLETED);
-            videoInfo.setSummary(summary);
+            videoInfo.setAudioUrl(result.getAudioUrl());
+            videoInfo.setTranscript(result.getTranscript());
+            videoInfo.setSummary(result.getSummary());
             videoInfo.setUpdatedAt(LocalDateTime.now());
             videoInfoMapper.updateById(videoInfo);
         } catch (Exception exception) {
             log.error("Video analysis failed, videoId={}", videoId, exception);
             videoInfo.setVideoStatus(VideoStatus.FAILED);
-            videoInfo.setSummary(exception.getMessage());
+            videoInfo.setSummary(getRootCauseMessage(exception));
             videoInfo.setUpdatedAt(LocalDateTime.now());
             videoInfoMapper.updateById(videoInfo);
         }
+    }
+
+    private String getRootCauseMessage(Exception exception) {
+        Throwable rootCause = exception;
+        while (rootCause.getCause() != null) {
+            rootCause = rootCause.getCause();
+        }
+
+        if (rootCause.getMessage() == null || rootCause.getMessage().isBlank()) {
+            return exception.getMessage();
+        }
+        if (rootCause == exception) {
+            return rootCause.getMessage();
+        }
+        return exception.getMessage() + ": " + rootCause.getMessage();
     }
 }

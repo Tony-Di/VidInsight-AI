@@ -1,6 +1,7 @@
 package com.videoinsight.backend.service.impl;
 
 import com.videoinsight.backend.entity.VideoInfo;
+import com.videoinsight.backend.model.response.VideoAnalysisResult;
 import com.videoinsight.backend.service.AiSummaryService;
 import com.videoinsight.backend.service.MediaProcessingService;
 import com.videoinsight.backend.service.SpeechRecognitionService;
@@ -19,9 +20,10 @@ public class VideoAnalysisServiceImpl implements VideoAnalysisService {
     private final AiSummaryService aiSummaryService;
 
     @Override
-    public String analyze(VideoInfo videoInfo) {
+    public VideoAnalysisResult analyze(VideoInfo videoInfo) {
         String audioUrl = mediaProcessingService.extractAudio(videoInfo);
         String transcript = speechRecognitionService.transcribe(audioUrl);
-        return aiSummaryService.summarize(transcript);
+        String summary = aiSummaryService.summarize(transcript);
+        return new VideoAnalysisResult(audioUrl, transcript, summary);
     }
 }

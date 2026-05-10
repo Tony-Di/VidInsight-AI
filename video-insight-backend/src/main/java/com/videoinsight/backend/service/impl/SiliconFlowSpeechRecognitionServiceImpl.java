@@ -64,7 +64,7 @@ public class SiliconFlowSpeechRecognitionServiceImpl implements SpeechRecognitio
             }
             return textNode.asText();
         } catch (IOException exception) {
-            throw new IllegalStateException("failed to call ASR service", exception);
+            throw new IllegalStateException("failed to call ASR service: " + exception.getMessage(), exception);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("ASR request was interrupted", exception);

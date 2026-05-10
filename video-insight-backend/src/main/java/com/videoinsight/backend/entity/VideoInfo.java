@@ -25,6 +25,12 @@ public class VideoInfo {
     @Schema(description = "External video URL or local uploaded file path.", example = "/uploads/videos/demo.mp4")
     private String sourceUrl;
 
+    @Schema(description = "Extracted audio file path.", example = "/uploads/audio/1.mp3")
+    private String audioUrl;
+
+    @Schema(description = "ASR transcript text generated from the extracted audio.")
+    private String transcript;
+
     @TableField("status")
     @Schema(description = "Current video workflow status.", example = "PENDING")
     private VideoStatus videoStatus;

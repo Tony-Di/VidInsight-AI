@@ -43,7 +43,7 @@ public class SiliconFlowAiSummaryServiceImpl implements AiSummaryService {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(siliconFlowProperties.getBaseUrl() + "/chat/completions"))
-                    .timeout(Duration.ofMinutes(5))
+                    .timeout(Duration.ofMinutes(20))
                     .header("Authorization", "Bearer " + siliconFlowProperties.getApiKey())
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(buildRequestBody(transcript), StandardCharsets.UTF_8))
@@ -66,7 +66,7 @@ public class SiliconFlowAiSummaryServiceImpl implements AiSummaryService {
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("failed to build AI summary request", exception);
         } catch (IOException exception) {
-            throw new IllegalStateException("failed to call AI summary service", exception);
+            throw new IllegalStateException("failed to call AI summary service: " + exception.getMessage(), exception);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("AI summary request was interrupted", exception);
