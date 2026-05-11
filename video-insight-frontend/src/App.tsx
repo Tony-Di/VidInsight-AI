@@ -66,6 +66,8 @@ function App() {
   const [mode, setMode] = useState<'upload' | 'link'>('upload');
   const [file, setFile] = useState<File | null>(null);
   const [fileTitle, setFileTitle] = useState('');
+  const [linkTitle, setLinkTitle] = useState('');
+  const [sourceUrl, setSourceUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [videos, setVideos] = useState<VideoInfo[]>([]);
   const [activeVideo, setActiveVideo] = useState<VideoInfo | null>(null);
@@ -173,6 +175,7 @@ function App() {
       message.success('Video submitted for analysis');
       setFile(null);
       setFileTitle('');
+      navigateTo('workbench');
     } catch (error) {
       message.error(error instanceof Error ? error.message : 'Submit failed');
     } finally {
@@ -188,6 +191,9 @@ function App() {
       setActiveVideo(analyzing);
       await loadVideos(true);
       message.success('Link submitted for analysis');
+      setLinkTitle('');
+      setSourceUrl('');
+      navigateTo('workbench');
     } catch (error) {
       message.error(error instanceof Error ? error.message : 'Submit failed');
     } finally {
@@ -210,64 +216,123 @@ function App() {
     },
   };
 
+  const handleHomeSubmit = () => {
+    if (mode === 'upload') {
+      void handleUpload();
+      return;
+    }
+
+    if (!sourceUrl.trim()) {
+      message.warning('Enter a video link first');
+      return;
+    }
+
+    void handleUrlSubmit({
+      title: linkTitle.trim() || 'Video link',
+      sourceUrl: sourceUrl.trim(),
+    });
+  };
+
   if (page === 'home') {
     return (
       <main className="landing-page">
-        <div className="landing-brand">
-          <span className="brand-dot" />
-          <span>VidInsight AI</span>
-        </div>
+        <header className="landing-nav">
+          <div className="landing-brand">
+            <span className="brand-dot" />
+            <span>VidInsight AI</span>
+          </div>
+          <Button type="text" onClick={() => navigateTo('workbench')}>
+            View Results
+          </Button>
+        </header>
 
-        <section className="landing-copy">
-          <Title>
-            VidInsight <span>AI</span>
-          </Title>
-          <Paragraph>Analyze video. Extract insight.</Paragraph>
-          <div className="title-rule" />
-          <Space size={14} wrap>
+        <section className="home-stage">
+          <div className="home-copy">
+            <Text className="section-kicker">Video Understanding</Text>
+            <Title>Analyze video in one step.</Title>
+            <Paragraph>
+              Upload a local file or paste a video link, then let the backend handle audio extraction,
+              speech recognition, and summary generation.
+            </Paragraph>
+          </div>
+
+          <div className="start-console">
+            <Segmented
+              block
+              value={mode}
+              onChange={(value) => setMode(value as 'upload' | 'link')}
+              options={[
+                {
+                  value: 'upload',
+                  label: (
+                    <Space size={6}>
+                      <CloudUploadOutlined />
+                      Local File
+                    </Space>
+                  ),
+                },
+                {
+                  value: 'link',
+                  label: (
+                    <Space size={6}>
+                      <LinkOutlined />
+                      Web Link
+                    </Space>
+                  ),
+                },
+              ]}
+            />
+
+            {mode === 'upload' ? (
+              <div className="home-input-stack">
+                <Input
+                  size="large"
+                  placeholder="Video title, default uses file name"
+                  value={fileTitle}
+                  onChange={(event) => setFileTitle(event.target.value)}
+                />
+                <Dragger {...uploadProps} className="home-upload">
+                  <p className="ant-upload-drag-icon">
+                    <CloudUploadOutlined />
+                  </p>
+                  <p className="ant-upload-text">Choose a local video</p>
+                  <p className="ant-upload-hint">mp4, mov, avi, mkv, webm</p>
+                </Dragger>
+              </div>
+            ) : (
+              <div className="home-input-stack">
+                <Input
+                  size="large"
+                  placeholder="Video title"
+                  value={linkTitle}
+                  onChange={(event) => setLinkTitle(event.target.value)}
+                />
+                <Input
+                  size="large"
+                  placeholder="Paste video link"
+                  prefix={<LinkOutlined />}
+                  value={sourceUrl}
+                  onChange={(event) => setSourceUrl(event.target.value)}
+                />
+                <Alert
+                  type="warning"
+                  showIcon
+                  message="Online video analysis needs the backend download adapter before it can fully run."
+                />
+              </div>
+            )}
+
             <Button
               type="primary"
               size="large"
-              icon={<ArrowRightOutlined />}
-              onClick={() => navigateTo('workbench')}
+              icon={<PlayCircleOutlined />}
+              loading={submitting}
+              disabled={mode === 'upload' ? !file : !sourceUrl.trim()}
+              onClick={handleHomeSubmit}
+              block
             >
               Start Analysis
             </Button>
-          </Space>
-        </section>
-
-        <section className="landing-film" aria-hidden="true">
-          <div className="film-holes top" />
-          <div className="film-holes bottom" />
-          <div className="film-card landscape">
-            <span className="play-dot" />
-            <span>00:12:46</span>
-          </div>
-          <div className="film-card travel">
-            <span className="play-dot" />
-            <span>00:24:18</span>
-          </div>
-          <div className="film-card city">
-            <span className="play-dot" />
-            <span>00:41:33</span>
-          </div>
-        </section>
-
-        <section className="landing-analysis" aria-hidden="true">
-          <div className="waveform">
-            {Array.from({ length: 86 }, (_, index) => (
-              <i key={index} style={{ height: `${10 + ((index * 17) % 42)}px` }} />
-            ))}
-          </div>
-          <div className="transcript-line">
-            <b>00:24:18</b>
-            <span>The journey begins with a single frame, decoded into text, summary, and insight.</span>
-          </div>
-          <div className="landing-tags">
-            <Tag>Landscape</Tag>
-            <Tag>Travel</Tag>
-            <Tag>Transcript</Tag>
-            <Tag>Summary</Tag>
           </div>
         </section>
       </main>
