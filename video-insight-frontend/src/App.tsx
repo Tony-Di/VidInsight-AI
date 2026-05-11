@@ -40,12 +40,13 @@ import {
 
 const { Dragger } = Upload;
 const { Paragraph, Text, Title } = Typography;
+type Page = 'home' | 'workbench';
 
 const statusMeta: Record<VideoStatus, { color: string; label: string }> = {
-  PENDING: { color: 'default', label: '待分析' },
-  PROCESSING: { color: 'processing', label: '分析中' },
-  COMPLETED: { color: 'success', label: '已完成' },
-  FAILED: { color: 'error', label: '失败' },
+  PENDING: { color: 'default', label: 'Pending' },
+  PROCESSING: { color: 'processing', label: 'Processing' },
+  COMPLETED: { color: 'success', label: 'Completed' },
+  FAILED: { color: 'error', label: 'Failed' },
 };
 
 function getStatusIcon(status: VideoStatus) {
@@ -55,8 +56,13 @@ function getStatusIcon(status: VideoStatus) {
   return <PlayCircleOutlined />;
 }
 
+function getPageFromPath(): Page {
+  return window.location.pathname === '/workbench' ? 'workbench' : 'home';
+}
+
 function App() {
   const { message } = AntdApp.useApp();
+  const [page, setPage] = useState<Page>(() => getPageFromPath());
   const [mode, setMode] = useState<'upload' | 'link'>('upload');
   const [file, setFile] = useState<File | null>(null);
   const [fileTitle, setFileTitle] = useState('');
@@ -71,6 +77,14 @@ function App() {
     [videos],
   );
 
+  const navigateTo = useCallback((nextPage: Page) => {
+    const nextPath = nextPage === 'workbench' ? '/workbench' : '/';
+    if (window.location.pathname !== nextPath) {
+      window.history.pushState(null, '', nextPath);
+    }
+    setPage(nextPage);
+  }, []);
+
   const loadVideos = useCallback(async (silent = false) => {
     if (!silent) setRefreshing(true);
     try {
@@ -81,15 +95,26 @@ function App() {
         return data.find((video) => video.id === current.id) ?? data[0] ?? null;
       });
     } catch (error) {
-      message.error(error instanceof Error ? error.message : '视频列表加载失败');
+      message.error(error instanceof Error ? error.message : 'Failed to load videos');
     } finally {
       if (!silent) setRefreshing(false);
     }
   }, [message]);
 
   useEffect(() => {
-    void loadVideos();
-  }, [loadVideos]);
+    const handlePopState = () => {
+      setPage(getPageFromPath());
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  useEffect(() => {
+    if (page === 'workbench') {
+      void loadVideos();
+    }
+  }, [loadVideos, page]);
 
   useEffect(() => {
     if (pollTimerRef.current) {
@@ -135,7 +160,7 @@ function App() {
 
   const handleUpload = async () => {
     if (!file) {
-      message.warning('先选择一个本地视频');
+      message.warning('Choose a local video first');
       return;
     }
 
@@ -145,11 +170,11 @@ function App() {
       const analyzing = await analyzeVideo(created.id);
       setActiveVideo(analyzing);
       await loadVideos(true);
-      message.success('视频已提交分析');
+      message.success('Video submitted for analysis');
       setFile(null);
       setFileTitle('');
     } catch (error) {
-      message.error(error instanceof Error ? error.message : '提交失败');
+      message.error(error instanceof Error ? error.message : 'Submit failed');
     } finally {
       setSubmitting(false);
     }
@@ -162,9 +187,9 @@ function App() {
       const analyzing = await analyzeVideo(created.id);
       setActiveVideo(analyzing);
       await loadVideos(true);
-      message.success('链接已提交分析');
+      message.success('Link submitted for analysis');
     } catch (error) {
-      message.error(error instanceof Error ? error.message : '提交失败');
+      message.error(error instanceof Error ? error.message : 'Submit failed');
     } finally {
       setSubmitting(false);
     }
@@ -174,16 +199,10 @@ function App() {
     accept: '.mp4,.mov,.avi,.mkv,.webm',
     multiple: false,
     maxCount: 1,
-    showUploadList: file
-      ? {
-          showRemoveIcon: true,
-        }
-      : false,
+    showUploadList: file ? { showRemoveIcon: true } : false,
     beforeUpload: (selectedFile) => {
       setFile(selectedFile);
-      if (!fileTitle) {
-        setFileTitle(selectedFile.name);
-      }
+      if (!fileTitle) setFileTitle(selectedFile.name);
       return false;
     },
     onRemove: () => {
@@ -191,237 +210,281 @@ function App() {
     },
   };
 
+  if (page === 'home') {
+    return (
+      <main className="landing-page">
+        <div className="landing-brand">
+          <span className="brand-dot" />
+          <span>VidInsight AI</span>
+        </div>
+
+        <section className="landing-copy">
+          <Title>
+            VidInsight <span>AI</span>
+          </Title>
+          <Paragraph>Analyze video. Extract insight.</Paragraph>
+          <div className="title-rule" />
+          <Space size={14} wrap>
+            <Button
+              type="primary"
+              size="large"
+              icon={<ArrowRightOutlined />}
+              onClick={() => navigateTo('workbench')}
+            >
+              Start Analysis
+            </Button>
+          </Space>
+        </section>
+
+        <section className="landing-film" aria-hidden="true">
+          <div className="film-holes top" />
+          <div className="film-holes bottom" />
+          <div className="film-card landscape">
+            <span className="play-dot" />
+            <span>00:12:46</span>
+          </div>
+          <div className="film-card travel">
+            <span className="play-dot" />
+            <span>00:24:18</span>
+          </div>
+          <div className="film-card city">
+            <span className="play-dot" />
+            <span>00:41:33</span>
+          </div>
+        </section>
+
+        <section className="landing-analysis" aria-hidden="true">
+          <div className="waveform">
+            {Array.from({ length: 86 }, (_, index) => (
+              <i key={index} style={{ height: `${10 + ((index * 17) % 42)}px` }} />
+            ))}
+          </div>
+          <div className="transcript-line">
+            <b>00:24:18</b>
+            <span>The journey begins with a single frame, decoded into text, summary, and insight.</span>
+          </div>
+          <div className="landing-tags">
+            <Tag>Landscape</Tag>
+            <Tag>Travel</Tag>
+            <Tag>Transcript</Tag>
+            <Tag>Summary</Tag>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="page-shell">
-        <section className="hero-grid">
-          <div className="brand-panel">
-            <div className="brand-mark">
-              <span className="brand-dot" />
-              <span>VidInsight AI</span>
+      <section className="workbench-header">
+        <div>
+          <Button type="text" onClick={() => navigateTo('home')}>
+            VidInsight AI
+          </Button>
+          <Title>Video Analysis Workbench</Title>
+          <Paragraph>
+            Upload a local video or submit a link. The backend extracts audio, runs ASR, and generates a summary.
+          </Paragraph>
+        </div>
+        <Row gutter={12} className="stats-row compact">
+          <Col span={8}>
+            <Statistic title="Total" value={videos.length} />
+          </Col>
+          <Col span={8}>
+            <Statistic title="Done" value={completedCount} />
+          </Col>
+          <Col span={8}>
+            <Statistic title="Queue" value={videos.length - completedCount} />
+          </Col>
+        </Row>
+      </section>
+
+      <section className="submit-grid">
+        <div className="action-panel">
+          <div className="panel-head">
+            <div>
+              <Text className="section-kicker">Start</Text>
+              <Title level={2}>Submit Analysis Task</Title>
             </div>
-            <div className="cover-art" aria-hidden="true">
-              <div className="video-strip">
-                <div className="frame frame-a" />
-                <div className="frame frame-b" />
-                <div className="frame frame-c" />
-              </div>
-              <div className="wave-line" />
-              <div className="tag-chip chip-a">Scene</div>
-              <div className="tag-chip chip-b">ASR</div>
-              <div className="tag-chip chip-c">Summary</div>
-            </div>
-            <div className="hero-copy">
-              <Text className="eyebrow">VIDEO UNDERSTANDING WORKBENCH</Text>
-              <Title>Analyze video. Extract insight.</Title>
-              <Paragraph>
-                上传视频或提交链接，后端会完成抽音频、语音识别和内容总结。首页只保留最短路径，让用户直接开始分析。
-              </Paragraph>
-            </div>
-            <Row gutter={12} className="stats-row">
-              <Col span={8}>
-                <Statistic title="Total" value={videos.length} />
-              </Col>
-              <Col span={8}>
-                <Statistic title="Done" value={completedCount} />
-              </Col>
-              <Col span={8}>
-                <Statistic title="Queue" value={videos.length - completedCount} />
-              </Col>
-            </Row>
+            <Segmented
+              value={mode}
+              onChange={(value) => setMode(value as 'upload' | 'link')}
+              options={[
+                {
+                  value: 'upload',
+                  label: (
+                    <Space size={6}>
+                      <CloudUploadOutlined />
+                      Local File
+                    </Space>
+                  ),
+                },
+                {
+                  value: 'link',
+                  label: (
+                    <Space size={6}>
+                      <LinkOutlined />
+                      Video Link
+                    </Space>
+                  ),
+                },
+              ]}
+            />
           </div>
 
-          <div className="action-panel">
-            <div className="panel-head">
-              <div>
-                <Text className="section-kicker">Start</Text>
-                <Title level={2}>提交分析任务</Title>
-              </div>
-              <Segmented
-                value={mode}
-                onChange={(value) => setMode(value as 'upload' | 'link')}
-                options={[
-                  {
-                    value: 'upload',
-                    label: (
-                      <Space size={6}>
-                        <CloudUploadOutlined />
-                        本地上传
-                      </Space>
-                    ),
-                  },
-                  {
-                    value: 'link',
-                    label: (
-                      <Space size={6}>
-                        <LinkOutlined />
-                        视频链接
-                      </Space>
-                    ),
-                  },
-                ]}
+          {mode === 'upload' ? (
+            <div className="flow-card">
+              <Input
+                placeholder="Video title, default uses file name"
+                value={fileTitle}
+                onChange={(event) => setFileTitle(event.target.value)}
               />
-            </div>
-
-            {mode === 'upload' ? (
-              <div className="flow-card">
-                <Input
-                  placeholder="视频标题，可默认使用文件名"
-                  value={fileTitle}
-                  onChange={(event) => setFileTitle(event.target.value)}
-                />
-                <Dragger {...uploadProps} className="upload-drop">
-                  <p className="ant-upload-drag-icon">
-                    <CloudUploadOutlined />
-                  </p>
-                  <p className="ant-upload-text">拖拽视频到这里，或点击选择文件</p>
-                  <p className="ant-upload-hint">支持 mp4、mov、avi、mkv、webm</p>
-                </Dragger>
-                <Button
-                  type="primary"
-                  icon={<ArrowRightOutlined />}
-                  loading={submitting}
-                  disabled={!file}
-                  onClick={handleUpload}
-                  block
-                >
-                  上传并开始分析
-                </Button>
-              </div>
-            ) : (
-              <div className="flow-card">
-                <Alert
-                  type="warning"
-                  showIcon
-                  message="当前后端还没有接入 yt-dlp，链接任务可以创建，但真实在线下载分析需要后续补齐下载适配层。"
-                />
-                <Form layout="vertical" onFinish={handleUrlSubmit}>
-                  <Form.Item
-                    name="title"
-                    label="标题"
-                    rules={[{ required: true, message: '请输入视频标题' }]}
-                  >
-                    <Input placeholder="例如：产品演示视频" />
-                  </Form.Item>
-                  <Form.Item
-                    name="sourceUrl"
-                    label="视频链接"
-                    rules={[{ required: true, message: '请输入视频链接' }]}
-                  >
-                    <Input placeholder="https://..." prefix={<LinkOutlined />} />
-                  </Form.Item>
-                  <Button
-                    type="primary"
-                    htmlType="submit"
-                    icon={<ArrowRightOutlined />}
-                    loading={submitting}
-                    block
-                  >
-                    提交链接并开始分析
-                  </Button>
-                </Form>
-              </div>
-            )}
-          </div>
-        </section>
-
-        <section className="workspace-grid">
-          <div className="list-panel">
-            <div className="section-title">
-              <div>
-                <Text className="section-kicker">Library</Text>
-                <Title level={3}>最近视频</Title>
-              </div>
+              <Dragger {...uploadProps} className="upload-drop">
+                <p className="ant-upload-drag-icon">
+                  <CloudUploadOutlined />
+                </p>
+                <p className="ant-upload-text">Drop video here, or click to choose a file</p>
+                <p className="ant-upload-hint">Supports mp4, mov, avi, mkv, webm</p>
+              </Dragger>
               <Button
-                icon={<ReloadOutlined />}
-                loading={refreshing}
-                onClick={() => void loadVideos()}
+                type="primary"
+                icon={<ArrowRightOutlined />}
+                loading={submitting}
+                disabled={!file}
+                onClick={handleUpload}
+                block
               >
-                刷新
+                Upload and Start Analysis
               </Button>
             </div>
-            {videos.length ? (
-              <List
-                dataSource={videos}
-                renderItem={(video) => (
-                  <List.Item
-                    className={video.id === activeVideo?.id ? 'video-row active' : 'video-row'}
-                    onClick={() => setActiveVideo(video)}
-                  >
-                    <List.Item.Meta
-                      avatar={getStatusIcon(video.videoStatus)}
-                      title={
-                        <Space>
-                          <span>{video.title}</span>
-                          <Tag color={statusMeta[video.videoStatus].color}>
-                            {statusMeta[video.videoStatus].label}
-                          </Tag>
-                        </Space>
-                      }
-                      description={video.sourceUrl}
-                    />
-                  </List.Item>
-                )}
+          ) : (
+            <div className="flow-card">
+              <Alert
+                type="warning"
+                showIcon
+                message="The backend can create URL tasks, but real online video downloading still needs a yt-dlp adapter."
               />
-            ) : (
-              <Empty description="还没有视频记录" />
-            )}
-          </div>
-
-          <div className="result-panel">
-            <div className="section-title">
-              <div>
-                <Text className="section-kicker">Result</Text>
-                <Title level={3}>分析结果</Title>
-              </div>
-              {activeVideo && (
-                <Tag color={statusMeta[activeVideo.videoStatus].color}>
-                  {statusMeta[activeVideo.videoStatus].label}
-                </Tag>
-              )}
+              <Form layout="vertical" onFinish={handleUrlSubmit}>
+                <Form.Item
+                  name="title"
+                  label="Title"
+                  rules={[{ required: true, message: 'Enter a video title' }]}
+                >
+                  <Input placeholder="Product demo video" />
+                </Form.Item>
+                <Form.Item
+                  name="sourceUrl"
+                  label="Video link"
+                  rules={[{ required: true, message: 'Enter a video link' }]}
+                >
+                  <Input placeholder="https://..." prefix={<LinkOutlined />} />
+                </Form.Item>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  icon={<ArrowRightOutlined />}
+                  loading={submitting}
+                  block
+                >
+                  Submit Link and Start Analysis
+                </Button>
+              </Form>
             </div>
+          )}
+        </div>
+      </section>
 
-            {activeVideo ? (
-              <Space direction="vertical" size={18} className="result-stack">
-                <div className="detail-head">
-                  <div>
-                    <Title level={4}>{activeVideo.title}</Title>
-                    <Text type="secondary">{activeVideo.sourceUrl}</Text>
-                  </div>
-                  {(activeVideo.videoStatus === 'PENDING' || activeVideo.videoStatus === 'FAILED') && (
-                    <Button
-                      icon={<PlayCircleOutlined />}
-                      onClick={() => void handleStartAnalysis(activeVideo)}
-                    >
-                      重新分析
-                    </Button>
-                  )}
-                </div>
+      <section className="workspace-grid">
+        <div className="list-panel">
+          <div className="section-title">
+            <div>
+              <Text className="section-kicker">Library</Text>
+              <Title level={3}>Recent Videos</Title>
+            </div>
+            <Button icon={<ReloadOutlined />} loading={refreshing} onClick={() => void loadVideos()}>
+              Refresh
+            </Button>
+          </div>
+          {videos.length ? (
+            <List
+              dataSource={videos}
+              renderItem={(video) => (
+                <List.Item
+                  className={video.id === activeVideo?.id ? 'video-row active' : 'video-row'}
+                  onClick={() => setActiveVideo(video)}
+                >
+                  <List.Item.Meta
+                    avatar={getStatusIcon(video.videoStatus)}
+                    title={
+                      <Space>
+                        <span>{video.title}</span>
+                        <Tag color={statusMeta[video.videoStatus].color}>
+                          {statusMeta[video.videoStatus].label}
+                        </Tag>
+                      </Space>
+                    }
+                    description={video.sourceUrl}
+                  />
+                </List.Item>
+              )}
+            />
+          ) : (
+            <Empty description="No video records yet" />
+          )}
+        </div>
 
-                <div className="result-block">
-                  <Space>
-                    <FileTextOutlined />
-                    <Text strong>Transcript</Text>
-                  </Space>
-                  <Paragraph>
-                    {activeVideo.transcript || '分析完成后，这里会展示 ASR 转写文本。'}
-                  </Paragraph>
-                </div>
-
-                <div className="result-block highlight">
-                  <Space>
-                    <ApiOutlined />
-                    <Text strong>Summary</Text>
-                  </Space>
-                  <Paragraph>
-                    {activeVideo.summary || '分析完成后，这里会展示 AI 生成的内容总结。'}
-                  </Paragraph>
-                </div>
-              </Space>
-            ) : (
-              <Empty description="选择或上传一个视频后查看结果" />
+        <div className="result-panel">
+          <div className="section-title">
+            <div>
+              <Text className="section-kicker">Result</Text>
+              <Title level={3}>Analysis Result</Title>
+            </div>
+            {activeVideo && (
+              <Tag color={statusMeta[activeVideo.videoStatus].color}>
+                {statusMeta[activeVideo.videoStatus].label}
+              </Tag>
             )}
           </div>
-        </section>
+
+          {activeVideo ? (
+            <Space direction="vertical" size={18} className="result-stack">
+              <div className="detail-head">
+                <div>
+                  <Title level={4}>{activeVideo.title}</Title>
+                  <Text type="secondary">{activeVideo.sourceUrl}</Text>
+                </div>
+                {(activeVideo.videoStatus === 'PENDING' || activeVideo.videoStatus === 'FAILED') && (
+                  <Button icon={<PlayCircleOutlined />} onClick={() => void handleStartAnalysis(activeVideo)}>
+                    Re-run
+                  </Button>
+                )}
+              </div>
+
+              <div className="result-block">
+                <Space>
+                  <FileTextOutlined />
+                  <Text strong>Transcript</Text>
+                </Space>
+                <Paragraph>
+                  {activeVideo.transcript || 'ASR transcript will appear here after analysis completes.'}
+                </Paragraph>
+              </div>
+
+              <div className="result-block highlight">
+                <Space>
+                  <ApiOutlined />
+                  <Text strong>Summary</Text>
+                </Space>
+                <Paragraph>
+                  {activeVideo.summary || 'AI summary will appear here after analysis completes.'}
+                </Paragraph>
+              </div>
+            </Space>
+          ) : (
+            <Empty description="Choose or upload a video to inspect the result" />
+          )}
+        </div>
+      </section>
     </main>
   );
 }

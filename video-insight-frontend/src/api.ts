@@ -20,10 +20,11 @@ interface ApiResponse<T> {
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
-  const payload = (await response.json()) as ApiResponse<T>;
+  const text = await response.text();
+  const payload = text ? (JSON.parse(text) as ApiResponse<T>) : null;
 
-  if (!response.ok || payload.code !== 200) {
-    throw new Error(payload.message || 'Request failed');
+  if (!response.ok || !payload || payload.code !== 200) {
+    throw new Error(payload?.message || `Request failed: ${response.status}`);
   }
 
   return payload.data;
