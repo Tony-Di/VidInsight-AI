@@ -18,6 +18,18 @@ interface ApiResponse<T> {
   data: T;
 }
 
+interface ChunkUploadInitResponse {
+  uploadId: string;
+}
+
+interface ChunkUploadResponse {
+  uploadId: string;
+  uploadedChunks: number;
+  totalChunks: number;
+}
+
+const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB per chunk
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
   const text = await response.text();
@@ -30,6 +42,59 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   return payload.data;
 }
 
+async function initChunkUpload(
+  title: string,
+  fileName: string,
+  totalChunks: number,
+): Promise<ChunkUploadInitResponse> {
+  return request<ChunkUploadInitResponse>('/api/videos/chunks/init', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, fileName, totalChunks }),
+  });
+}
+
+async function uploadChunk(
+  uploadId: string,
+  chunkIndex: number,
+  chunk: Blob,
+): Promise<ChunkUploadResponse> {
+  const formData = new FormData();
+  formData.append('file', chunk);
+  return request<ChunkUploadResponse>(
+    `/api/videos/chunks/upload?uploadId=${encodeURIComponent(uploadId)}&chunkIndex=${chunkIndex}`,
+    { method: 'POST', body: formData },
+  );
+}
+
+async function completeChunkUpload(uploadId: string): Promise<VideoInfo> {
+  return request<VideoInfo>(
+    `/api/videos/chunks/complete?uploadId=${encodeURIComponent(uploadId)}`,
+    { method: 'POST' },
+  );
+}
+
+export async function uploadVideoChunked(
+  file: File,
+  title: string,
+  onProgress?: (pct: number) => void,
+): Promise<VideoInfo> {
+  const totalChunks = Math.max(1, Math.ceil(file.size / CHUNK_SIZE));
+  const { uploadId } = await initChunkUpload(title || file.name, file.name, totalChunks);
+
+  for (let i = 0; i < totalChunks; i++) {
+    const start = i * CHUNK_SIZE;
+    const chunk = file.slice(start, Math.min(start + CHUNK_SIZE, file.size));
+    await uploadChunk(uploadId, i, chunk);
+    // reserve last 5% for the merge step
+    onProgress?.(Math.round(((i + 1) / totalChunks) * 95));
+  }
+
+  const videoInfo = await completeChunkUpload(uploadId);
+  onProgress?.(100);
+  return videoInfo;
+}
+
 export async function listVideos(): Promise<VideoInfo[]> {
   return request<VideoInfo[]>('/api/videos');
 }
@@ -38,29 +103,11 @@ export async function getVideo(id: number): Promise<VideoInfo> {
   return request<VideoInfo>(`/api/videos/${id}`);
 }
 
-export async function uploadVideo(file: File, title?: string): Promise<VideoInfo> {
-  const formData = new FormData();
-  formData.append('file', file);
-  if (title?.trim()) {
-    formData.append('title', title.trim());
-  }
-
-  return request<VideoInfo>('/api/videos/upload', {
-    method: 'POST',
-    body: formData,
-  });
-}
-
 export async function createVideoByUrl(title: string, sourceUrl: string): Promise<VideoInfo> {
   return request<VideoInfo>('/api/videos', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      title,
-      sourceUrl,
-    }),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, sourceUrl }),
   });
 }
 

@@ -10,24 +10,17 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       theme={{
         algorithm: theme.darkAlgorithm,
         token: {
-          colorPrimary: '#8B7CFF',
-          colorSuccess: '#63E6BE',
-          colorBgBase: '#090A18',
-          colorTextBase: '#EDEEFF',
-          borderRadius: 8,
+          colorPrimary: '#b8ff00',
+          colorSuccess: '#b8ff00',
+          colorBgBase: '#070a0e',
+          colorTextBase: '#dde2f0',
+          borderRadius: 6,
           fontFamily:
             'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         },
         components: {
-          Button: {
-            controlHeight: 42,
-            fontWeight: 700,
-          },
-          Card: {
-            colorBgContainer: 'rgba(20, 21, 42, 0.76)',
-          },
-          Input: {
-            controlHeight: 42,
+          Upload: {
+            colorBgContainer: 'transparent',
           },
         },
       }}
