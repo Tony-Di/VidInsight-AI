@@ -3,8 +3,8 @@ import type { UploadProps } from 'antd';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   analyzeVideo,
-  createVideoByUrl,
   getVideo,
+  importVideoByUrl,
   listVideos,
   uploadVideoChunked,
   type VideoInfo,
@@ -17,11 +17,16 @@ type DetailTab = 'transcript' | 'summary';
 type Lang = 'zh' | 'en';
 
 const STATUS_LABEL: Record<VideoStatus, string> = {
+  UPLOADING: 'UPLOAD',
+  IMPORTING: 'IMPORT',
+  IMPORT_FAILED: 'IMPORT FAILED',
   PENDING: 'PENDING',
   PROCESSING: 'PROC',
   COMPLETED: 'READY',
   FAILED: 'FAILED',
 };
+
+const POLLING_STATUSES = new Set<VideoStatus>(['IMPORTING', 'PROCESSING']);
 
 const TRANSLATIONS = {
   zh: {
@@ -221,14 +226,21 @@ function App() {
       window.clearInterval(pollTimerRef.current);
       pollTimerRef.current = null;
     }
-    if (!activeVideo || activeVideo.videoStatus !== 'PROCESSING') return;
+    if (!activeVideo || !POLLING_STATUSES.has(activeVideo.videoStatus)) return;
 
     pollTimerRef.current = window.setInterval(async () => {
       try {
         const latest = await getVideo(activeVideo.id);
+        if (activeVideo.videoStatus === 'IMPORTING' && latest.videoStatus === 'PENDING') {
+          const analyzing = await analyzeVideo(latest.id);
+          setActiveVideo(analyzing);
+          setVideos((curr) => curr.map((v) => (v.id === analyzing.id ? analyzing : v)));
+          return;
+        }
+
         setActiveVideo(latest);
         setVideos((curr) => curr.map((v) => (v.id === latest.id ? latest : v)));
-        if (latest.videoStatus !== 'PROCESSING' && pollTimerRef.current) {
+        if (!POLLING_STATUSES.has(latest.videoStatus) && pollTimerRef.current) {
           window.clearInterval(pollTimerRef.current);
           pollTimerRef.current = null;
         }
@@ -280,9 +292,8 @@ function App() {
     if (!sourceUrl.trim()) return;
     setSubmitting(true);
     try {
-      const created = await createVideoByUrl('Video link', sourceUrl.trim());
-      const analyzing = await analyzeVideo(created.id);
-      setActiveVideo(analyzing);
+      const importing = await importVideoByUrl('Video link', sourceUrl.trim());
+      setActiveVideo(importing);
       await loadVideos(true);
       message.success(t('msg_submitted_url'));
       setSourceUrl('');

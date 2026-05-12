@@ -467,10 +467,18 @@ body {
   background: var(--accent-dim);
   box-shadow: 0 0 10px var(--accent-glow);
 }
+.vi-status-UPLOADING,
+.vi-status-IMPORTING {
+  color: #ffd166;
+  border-color: rgba(255, 209, 102, 0.45);
+  background: rgba(255, 209, 102, 0.08);
+  box-shadow: 0 0 10px rgba(255, 209, 102, 0.15);
+}
 .vi-status-PENDING    {
   color: var(--text-dim);
   border-color: var(--border-bright);
 }
+.vi-status-IMPORT_FAILED,
 .vi-status-FAILED     {
   color: var(--danger);
   border-color: var(--danger-soft);

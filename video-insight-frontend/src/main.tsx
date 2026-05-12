@@ -10,10 +10,10 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       theme={{
         algorithm: theme.darkAlgorithm,
         token: {
-          colorPrimary: '#b8ff00',
-          colorSuccess: '#b8ff00',
-          colorBgBase: '#070a0e',
-          colorTextBase: '#dde2f0',
+          colorPrimary: '#00e1ff',
+          colorSuccess: '#4dffc4',
+          colorBgBase: '#050813',
+          colorTextBase: '#d8e4f7',
           borderRadius: 6,
           fontFamily:
             'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',

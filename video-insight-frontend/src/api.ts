@@ -1,4 +1,11 @@
-export type VideoStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+export type VideoStatus =
+  | 'UPLOADING'
+  | 'IMPORTING'
+  | 'IMPORT_FAILED'
+  | 'PENDING'
+  | 'PROCESSING'
+  | 'COMPLETED'
+  | 'FAILED';
 
 export interface VideoInfo {
   id: number;
@@ -105,6 +112,14 @@ export async function getVideo(id: number): Promise<VideoInfo> {
 
 export async function createVideoByUrl(title: string, sourceUrl: string): Promise<VideoInfo> {
   return request<VideoInfo>('/api/videos', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, sourceUrl }),
+  });
+}
+
+export async function importVideoByUrl(title: string, sourceUrl: string): Promise<VideoInfo> {
+  return request<VideoInfo>('/api/videos/import-url', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title, sourceUrl }),
