@@ -9,14 +9,18 @@ import com.videoinsight.backend.model.request.VideoCreateRequest;
 import com.videoinsight.backend.service.FileStorageService;
 import com.videoinsight.backend.service.VideoAnalysisTaskService;
 import com.videoinsight.backend.service.VideoInfoService;
+import com.videoinsight.backend.util.FileHashUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class VideoInfoServiceImpl extends ServiceImpl<VideoInfoMapper, VideoInfo> implements VideoInfoService {
@@ -44,17 +48,37 @@ public class VideoInfoServiceImpl extends ServiceImpl<VideoInfoMapper, VideoInfo
     public VideoInfo uploadVideo(MultipartFile file, String title) {
         String sourceUrl = fileStorageService.saveVideo(file);
         String videoTitle = StringUtils.hasText(title) ? title : file.getOriginalFilename();
-        LocalDateTime now = LocalDateTime.now();
 
+        // MD5 去重
+        String md5 = computeMd5OrNull(fileStorageService.resolveLocalPath(sourceUrl));
+        if (md5 != null) {
+            VideoInfo existing = getBaseMapper().findCompletedByMd5(md5);
+            if (existing != null) {
+                log.info("Duplicate video detected (md5={}), reusing result from videoId={}", md5, existing.getId());
+                return existing;
+            }
+        }
+
+        LocalDateTime now = LocalDateTime.now();
         VideoInfo videoInfo = new VideoInfo();
         videoInfo.setTitle(videoTitle);
         videoInfo.setVideoStatus(VideoStatus.PENDING);
         videoInfo.setSourceUrl(sourceUrl);
+        videoInfo.setFileMd5(md5);
         videoInfo.setCreatedAt(now);
         videoInfo.setUpdatedAt(now);
 
         save(videoInfo);
         return videoInfo;
+    }
+
+    private String computeMd5OrNull(java.nio.file.Path path) {
+        try {
+            return FileHashUtil.md5(path);
+        } catch (IOException e) {
+            log.warn("Failed to compute MD5 for {}: {}", path, e.getMessage());
+            return null;
+        }
     }
 
     @Override

@@ -25,6 +25,9 @@ public class VideoInfo {
     @Schema(description = "External video URL or local uploaded file path.", example = "/uploads/videos/demo.mp4")
     private String sourceUrl;
 
+    @Schema(description = "MD5 hash of the video file, used for content deduplication.")
+    private String fileMd5;
+
     @Schema(description = "Extracted audio file path.", example = "/uploads/audio/1.mp3")
     private String audioUrl;
 

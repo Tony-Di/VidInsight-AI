@@ -13,13 +13,17 @@ import com.videoinsight.backend.model.response.ChunkUploadInitResponse;
 import com.videoinsight.backend.model.response.ChunkUploadResponse;
 import com.videoinsight.backend.service.FileStorageService;
 import com.videoinsight.backend.service.VideoUploadTaskService;
+import com.videoinsight.backend.util.FileHashUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class VideoUploadTaskServiceImpl extends ServiceImpl<VideoUploadTaskMapper, VideoUploadTask>
@@ -111,7 +115,22 @@ public class VideoUploadTaskServiceImpl extends ServiceImpl<VideoUploadTaskMappe
                     uploadTask.getFileName(),
                     uploadTask.getTotalChunks()
             );
-            VideoInfo videoInfo = createVideoInfo(uploadTask, sourceUrl);
+
+            // MD5 去重：合并完成后计算文件哈希，复用已有的分析结果
+            String md5 = computeMd5OrNull(fileStorageService.resolveLocalPath(sourceUrl));
+            if (md5 != null) {
+                VideoInfo existing = videoInfoMapper.findCompletedByMd5(md5);
+                if (existing != null) {
+                    log.info("Duplicate video detected (md5={}), reusing result from videoId={}", md5, existing.getId());
+                    uploadTask.setStatus(UploadTaskStatus.COMPLETED);
+                    uploadTask.setUpdatedAt(LocalDateTime.now());
+                    updateById(uploadTask);
+                    fileStorageService.deleteChunks(uploadTask.getUploadId());
+                    return existing;
+                }
+            }
+
+            VideoInfo videoInfo = createVideoInfo(uploadTask, sourceUrl, md5);
 
             uploadTask.setStatus(UploadTaskStatus.COMPLETED);
             uploadTask.setUpdatedAt(LocalDateTime.now());
@@ -129,17 +148,27 @@ public class VideoUploadTaskServiceImpl extends ServiceImpl<VideoUploadTaskMappe
         }
     }
 
-    private VideoInfo createVideoInfo(VideoUploadTask uploadTask, String sourceUrl) {
+    private VideoInfo createVideoInfo(VideoUploadTask uploadTask, String sourceUrl, String md5) {
         LocalDateTime now = LocalDateTime.now();
 
         VideoInfo videoInfo = new VideoInfo();
         videoInfo.setTitle(uploadTask.getTitle());
         videoInfo.setSourceUrl(sourceUrl);
+        videoInfo.setFileMd5(md5);
         videoInfo.setVideoStatus(VideoStatus.PENDING);
         videoInfo.setCreatedAt(now);
         videoInfo.setUpdatedAt(now);
 
         videoInfoMapper.insert(videoInfo);
         return videoInfo;
+    }
+
+    private String computeMd5OrNull(java.nio.file.Path path) {
+        try {
+            return FileHashUtil.md5(path);
+        } catch (IOException e) {
+            log.warn("Failed to compute MD5 for {}: {}", path, e.getMessage());
+            return null;
+        }
     }
 }
