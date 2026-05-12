@@ -8,6 +8,8 @@ public interface FileStorageService {
 
     String saveVideo(MultipartFile file);
 
+    String saveVideo(Path file, String originalFilename);
+
     void validateVideoFilename(String filename);
 
     boolean saveChunk(String uploadId, Integer chunkIndex, MultipartFile file);

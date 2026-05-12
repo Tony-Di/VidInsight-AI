@@ -3,7 +3,9 @@ package com.videoinsight.backend.controller;
 import com.videoinsight.backend.common.ApiResponse;
 import com.videoinsight.backend.entity.VideoInfo;
 import com.videoinsight.backend.model.request.VideoCreateRequest;
+import com.videoinsight.backend.model.request.VideoImportRequest;
 import com.videoinsight.backend.service.VideoInfoService;
+import com.videoinsight.backend.service.VideoImportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -30,10 +32,18 @@ public class VideoInfoController {
 
     private final VideoInfoService videoInfoService;
 
+    private final VideoImportService videoImportService;
+
     @PostMapping
-    @Operation(summary = "Create video by URL", description = "Creates a video record from an external video URL.")
+    @Operation(summary = "Create video record by URL", description = "Creates a video record from an external video URL without downloading it.")
     public ApiResponse<VideoInfo> createVideo(@Valid @RequestBody VideoCreateRequest request) {
         return ApiResponse.success(videoInfoService.createVideo(request));
+    }
+
+    @PostMapping("/import-url")
+    @Operation(summary = "Import video from URL", description = "Creates an IMPORTING record and downloads the URL to local storage in the background.")
+    public ApiResponse<VideoInfo> importVideo(@Valid @RequestBody VideoImportRequest request) {
+        return ApiResponse.success(videoImportService.importVideo(request));
     }
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

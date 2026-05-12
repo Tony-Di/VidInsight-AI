@@ -4,6 +4,10 @@ public enum VideoStatus {
 
     UPLOADING,
 
+    IMPORTING,
+
+    IMPORT_FAILED,
+
     PENDING,
 
     PROCESSING,

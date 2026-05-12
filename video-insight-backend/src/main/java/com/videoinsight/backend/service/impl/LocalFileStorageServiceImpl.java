@@ -66,6 +66,36 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
     }
 
     @Override
+    public String saveVideo(Path file, String originalFilename) {
+        if (file == null || !Files.exists(file)) {
+            throw new IllegalArgumentException("video file is required");
+        }
+
+        String filename = StringUtils.cleanPath(
+                StringUtils.hasText(originalFilename) ? originalFilename : file.getFileName().toString()
+        );
+        String extension = getExtension(filename);
+        validateExtension(extension);
+
+        String storedFilename = UUID.randomUUID() + extension;
+        Path uploadPath = Path.of(videoDir).toAbsolutePath().normalize();
+        Path targetPath = uploadPath.resolve(storedFilename).normalize();
+
+        if (!targetPath.startsWith(uploadPath)) {
+            throw new IllegalArgumentException("invalid file path");
+        }
+
+        try {
+            Files.createDirectories(uploadPath);
+            Files.copy(file, targetPath, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException exception) {
+            throw new IllegalStateException("failed to save video file", exception);
+        }
+
+        return VIDEO_URL_PREFIX + storedFilename;
+    }
+
+    @Override
     public void validateVideoFilename(String filename) {
         validateExtension(getExtension(filename));
     }
