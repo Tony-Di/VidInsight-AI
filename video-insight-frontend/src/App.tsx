@@ -7,6 +7,7 @@ import {
   getVideo,
   importVideoByUrl,
   listVideos,
+  retryImport,
   uploadVideoChunked,
   type VideoInfo,
   type VideoStatus,
@@ -16,7 +17,7 @@ const PAGE_SIZE = 10;
 
 const { Dragger } = Upload;
 type Page = 'home' | 'workbench';
-type DetailTab = 'transcript' | 'summary';
+type DetailTab = 'transcript' | 'summary' | 'video';
 type Lang = 'zh' | 'en';
 
 const STATUS_LABEL: Record<VideoStatus, string> = {
@@ -62,12 +63,17 @@ const TRANSLATIONS = {
     card_summary: 'AI智能总结',
     card_reanalyze: '重新分析',
     card_delete: '删除',
+    card_retry: '重新导入',
     msg_delete_confirm_title: '确认删除？',
     msg_delete_confirm_content: '此操作不可撤销，视频文件和分析结果都将被删除。',
     msg_delete_ok: '删除',
     msg_delete_cancel: '取消',
     msg_delete_success: '已删除',
     msg_delete_failed: '删除失败',
+    msg_retry_submitted: '已重新提交导入',
+    msg_retry_failed: '重新导入失败',
+    modal_tab_video: '▷ 视频',
+    modal_video_unavailable: '视频暂不可用',
     modal_tab_transcript: '≡ 文字提取',
     modal_tab_summary: '◈ AI智能总结',
     modal_transcript_processing: '正在提取文字，请稍候...',
@@ -105,12 +111,17 @@ const TRANSLATIONS = {
     card_summary: 'AI Summary',
     card_reanalyze: 'Re-analyze',
     card_delete: 'Delete',
+    card_retry: 'Retry',
     msg_delete_confirm_title: 'Delete this video?',
     msg_delete_confirm_content: 'This cannot be undone. The video file and analysis results will be removed.',
     msg_delete_ok: 'Delete',
     msg_delete_cancel: 'Cancel',
     msg_delete_success: 'Deleted',
     msg_delete_failed: 'Delete failed',
+    msg_retry_submitted: 'Retry submitted',
+    msg_retry_failed: 'Retry failed',
+    modal_tab_video: '▷ Video',
+    modal_video_unavailable: 'Video not available',
     modal_tab_transcript: '≡ Transcript',
     modal_tab_summary: '◈ AI Summary',
     modal_transcript_processing: 'Extracting transcript, please wait...',
@@ -307,6 +318,17 @@ function App() {
         }
       },
     });
+  };
+
+  const handleRetryImport = async (video: VideoInfo) => {
+    try {
+      const importing = await retryImport(video.id);
+      setActiveVideo(importing);
+      setVideos((curr) => curr.map((v) => (v.id === importing.id ? importing : v)));
+      message.success(t('msg_retry_submitted'));
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : t('msg_retry_failed'));
+    }
   };
 
   const handleUpload = async () => {
@@ -590,6 +612,19 @@ function App() {
                     </button>
                   )}
 
+                  {video.videoStatus === 'IMPORT_FAILED' && (
+                    <button
+                      className="vi-card-action"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleRetryImport(video);
+                      }}
+                    >
+                      <span className="vi-action-icon">⟳</span>
+                      <span>{t('card_retry')}</span>
+                    </button>
+                  )}
+
                   <button
                     className="vi-card-action vi-action-danger"
                     onClick={(e) => {
@@ -641,6 +676,12 @@ function App() {
 
             <div className="vi-modal-tabs">
               <button
+                className={`vi-modal-tab ${detailTab === 'video' ? 'vi-tab-active' : ''}`}
+                onClick={() => setDetailTab('video')}
+              >
+                {t('modal_tab_video')}
+              </button>
+              <button
                 className={`vi-modal-tab ${detailTab === 'transcript' ? 'vi-tab-active' : ''}`}
                 onClick={() => setDetailTab('transcript')}
               >
@@ -655,7 +696,18 @@ function App() {
             </div>
 
             <div className="vi-modal-body">
-              {detailTab === 'transcript' ? (
+              {detailTab === 'video' ? (
+                activeVideo.sourceUrl && activeVideo.sourceUrl.startsWith('/uploads/') ? (
+                  <video
+                    className="vi-modal-video"
+                    src={activeVideo.sourceUrl}
+                    controls
+                    preload="metadata"
+                  />
+                ) : (
+                  <div className="vi-modal-empty">{t('modal_video_unavailable')}</div>
+                )
+              ) : detailTab === 'transcript' ? (
                 activeVideo.transcript ? (
                   <p className="vi-modal-text">{activeVideo.transcript}</p>
                 ) : (

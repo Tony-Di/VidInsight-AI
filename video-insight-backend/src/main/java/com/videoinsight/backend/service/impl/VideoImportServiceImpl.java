@@ -3,6 +3,7 @@ package com.videoinsight.backend.service.impl;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.videoinsight.backend.entity.VideoInfo;
 import com.videoinsight.backend.enums.VideoStatus;
+import com.videoinsight.backend.exception.BusinessException;
 import com.videoinsight.backend.mapper.VideoInfoMapper;
 import com.videoinsight.backend.model.request.VideoImportRequest;
 import com.videoinsight.backend.service.VideoImportService;
@@ -32,6 +33,31 @@ public class VideoImportServiceImpl extends ServiceImpl<VideoInfoMapper, VideoIn
 
         save(videoInfo);
         videoImportTaskService.submitImport(videoInfo.getId(), request.getSourceUrl());
+        return videoInfo;
+    }
+
+    @Override
+    public VideoInfo retryImport(Long id) {
+        VideoInfo videoInfo = getById(id);
+        if (videoInfo == null) {
+            throw new BusinessException(404, "video does not exist");
+        }
+        if (videoInfo.getVideoStatus() != VideoStatus.IMPORT_FAILED) {
+            throw new BusinessException(400, "only IMPORT_FAILED videos can be retried");
+        }
+        if (!StringUtils.hasText(videoInfo.getSourceUrl())
+                || (!videoInfo.getSourceUrl().startsWith("http://")
+                && !videoInfo.getSourceUrl().startsWith("https://"))) {
+            throw new BusinessException(400, "original source URL is not available for retry");
+        }
+
+        String originalUrl = videoInfo.getSourceUrl();
+        videoInfo.setVideoStatus(VideoStatus.IMPORTING);
+        videoInfo.setSummary(null);
+        videoInfo.setUpdatedAt(LocalDateTime.now());
+        updateById(videoInfo);
+
+        videoImportTaskService.submitImport(videoInfo.getId(), originalUrl);
         return videoInfo;
     }
 }

@@ -46,6 +46,12 @@ public class VideoInfoController {
         return ApiResponse.success(videoImportService.importVideo(request));
     }
 
+    @PostMapping("/{id}/retry-import")
+    @Operation(summary = "Retry failed import", description = "Re-submits an IMPORT_FAILED video using its original source URL.")
+    public ApiResponse<VideoInfo> retryImport(@Parameter(description = "Video id") @PathVariable Long id) {
+        return ApiResponse.success(videoImportService.retryImport(id));
+    }
+
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Upload local video", description = "Uploads a local video file and creates a video record.")
     public ApiResponse<VideoInfo> uploadVideo(@Parameter(description = "Local video file") @RequestPart("file") MultipartFile file,

@@ -6,4 +6,6 @@ import com.videoinsight.backend.model.request.VideoImportRequest;
 public interface VideoImportService {
 
     VideoInfo importVideo(VideoImportRequest request);
+
+    VideoInfo retryImport(Long id);
 }

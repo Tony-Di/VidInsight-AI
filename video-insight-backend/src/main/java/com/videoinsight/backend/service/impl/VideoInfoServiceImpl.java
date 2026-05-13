@@ -84,12 +84,14 @@ public class VideoInfoServiceImpl extends ServiceImpl<VideoInfoMapper, VideoInfo
 
     @Override
     public PageResult<VideoInfo> listVideos(int page, int pageSize) {
+        int safePage = Math.max(1, page);
+        int safePageSize = Math.min(100, Math.max(1, pageSize));
         long total = lambdaQuery().count();
         List<VideoInfo> records = lambdaQuery()
                 .orderByDesc(VideoInfo::getCreatedAt)
-                .last("LIMIT " + pageSize + " OFFSET " + (long) (page - 1) * pageSize)
+                .last("LIMIT " + safePageSize + " OFFSET " + (long) (safePage - 1) * safePageSize)
                 .list();
-        return new PageResult<>(total, page, pageSize, records);
+        return new PageResult<>(total, safePage, safePageSize, records);
     }
 
     @Override

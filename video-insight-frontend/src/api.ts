@@ -142,3 +142,9 @@ export async function analyzeVideo(id: number): Promise<VideoInfo> {
 export async function deleteVideo(id: number): Promise<void> {
   await request<void>(`/api/videos/${id}`, { method: 'DELETE' });
 }
+
+export async function retryImport(id: number): Promise<VideoInfo> {
+  return request<VideoInfo>(`/api/videos/${id}/retry-import`, {
+    method: 'POST',
+  });
+}
