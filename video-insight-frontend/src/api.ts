@@ -138,3 +138,7 @@ export async function analyzeVideo(id: number): Promise<VideoInfo> {
     method: 'POST',
   });
 }
+
+export async function deleteVideo(id: number): Promise<void> {
+  await request<void>(`/api/videos/${id}`, { method: 'DELETE' });
+}

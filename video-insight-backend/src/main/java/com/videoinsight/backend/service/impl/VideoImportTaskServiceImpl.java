@@ -6,6 +6,7 @@ import com.videoinsight.backend.mapper.VideoInfoMapper;
 import com.videoinsight.backend.service.FileStorageService;
 import com.videoinsight.backend.service.VideoDownloadService;
 import com.videoinsight.backend.service.VideoImportTaskService;
+import com.videoinsight.backend.util.FileHashUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -39,9 +40,30 @@ public class VideoImportTaskServiceImpl implements VideoImportTaskService {
         Path downloadedFile = null;
         try {
             downloadedFile = videoDownloadService.download(sourceUrl);
+
+            // MD5 去重：下载完成后算哈希，命中已完成记录则复用其 ASR + AI 结果
+            String md5 = computeMd5OrNull(downloadedFile);
+            if (md5 != null) {
+                VideoInfo existing = videoInfoMapper.findCompletedByMd5(md5);
+                if (existing != null) {
+                    log.info("Duplicate video detected on URL import (md5={}), reusing result from videoId={}",
+                            md5, existing.getId());
+                    videoInfo.setFileMd5(md5);
+                    videoInfo.setSourceUrl(existing.getSourceUrl());
+                    videoInfo.setAudioUrl(existing.getAudioUrl());
+                    videoInfo.setTranscript(existing.getTranscript());
+                    videoInfo.setSummary(existing.getSummary());
+                    videoInfo.setVideoStatus(VideoStatus.COMPLETED);
+                    videoInfo.setUpdatedAt(LocalDateTime.now());
+                    videoInfoMapper.updateById(videoInfo);
+                    return;
+                }
+            }
+
             String localSourceUrl = fileStorageService.saveVideo(downloadedFile, downloadedFile.getFileName().toString());
 
             videoInfo.setSourceUrl(localSourceUrl);
+            videoInfo.setFileMd5(md5);
             videoInfo.setVideoStatus(VideoStatus.PENDING);
             videoInfo.setSummary(null);
             videoInfo.setUpdatedAt(LocalDateTime.now());
@@ -54,6 +76,15 @@ public class VideoImportTaskServiceImpl implements VideoImportTaskService {
             videoInfoMapper.updateById(videoInfo);
         } finally {
             deleteTempFile(downloadedFile);
+        }
+    }
+
+    private String computeMd5OrNull(Path path) {
+        try {
+            return FileHashUtil.md5(path);
+        } catch (IOException e) {
+            log.warn("Failed to compute MD5 for {}: {}", path, e.getMessage());
+            return null;
         }
     }
 

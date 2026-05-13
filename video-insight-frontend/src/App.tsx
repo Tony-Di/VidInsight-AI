@@ -1,8 +1,9 @@
-import { App as AntdApp, Progress, Upload } from 'antd';
+import { App as AntdApp, Modal, Progress, Upload } from 'antd';
 import type { UploadProps } from 'antd';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   analyzeVideo,
+  deleteVideo,
   getVideo,
   importVideoByUrl,
   listVideos,
@@ -60,6 +61,13 @@ const TRANSLATIONS = {
     card_transcript: '提取文字',
     card_summary: 'AI智能总结',
     card_reanalyze: '重新分析',
+    card_delete: '删除',
+    msg_delete_confirm_title: '确认删除？',
+    msg_delete_confirm_content: '此操作不可撤销，视频文件和分析结果都将被删除。',
+    msg_delete_ok: '删除',
+    msg_delete_cancel: '取消',
+    msg_delete_success: '已删除',
+    msg_delete_failed: '删除失败',
     modal_tab_transcript: '≡ 文字提取',
     modal_tab_summary: '◈ AI智能总结',
     modal_transcript_processing: '正在提取文字，请稍候...',
@@ -96,6 +104,13 @@ const TRANSLATIONS = {
     card_transcript: 'Transcript',
     card_summary: 'AI Summary',
     card_reanalyze: 'Re-analyze',
+    card_delete: 'Delete',
+    msg_delete_confirm_title: 'Delete this video?',
+    msg_delete_confirm_content: 'This cannot be undone. The video file and analysis results will be removed.',
+    msg_delete_ok: 'Delete',
+    msg_delete_cancel: 'Cancel',
+    msg_delete_success: 'Deleted',
+    msg_delete_failed: 'Delete failed',
     modal_tab_transcript: '≡ Transcript',
     modal_tab_summary: '◈ AI Summary',
     modal_transcript_processing: 'Extracting transcript, please wait...',
@@ -273,6 +288,25 @@ function App() {
     } catch (error) {
       message.error(error instanceof Error ? error.message : t('msg_analyze_failed'));
     }
+  };
+
+  const handleDelete = (video: VideoInfo) => {
+    Modal.confirm({
+      title: t('msg_delete_confirm_title'),
+      content: t('msg_delete_confirm_content'),
+      okText: t('msg_delete_ok'),
+      cancelText: t('msg_delete_cancel'),
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await deleteVideo(video.id);
+          message.success(t('msg_delete_success'));
+          await loadVideos(currentPage, true);
+        } catch (error) {
+          message.error(error instanceof Error ? error.message : t('msg_delete_failed'));
+        }
+      },
+    });
   };
 
   const handleUpload = async () => {
@@ -555,6 +589,17 @@ function App() {
                       <span>{t('card_reanalyze')}</span>
                     </button>
                   )}
+
+                  <button
+                    className="vi-card-action vi-action-danger"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(video);
+                    }}
+                  >
+                    <span className="vi-action-icon">×</span>
+                    <span>{t('card_delete')}</span>
+                  </button>
                 </div>
               </div>
             ))

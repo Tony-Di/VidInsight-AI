@@ -510,6 +510,7 @@ body {
 .vi-card-action:disabled { opacity: 0.3; cursor: not-allowed; }
 .vi-card-action.vi-action-purple { color: var(--magenta); }
 .vi-card-action.vi-action-purple:hover { background: var(--magenta-dim); color: var(--magenta); }
+.vi-card-action.vi-action-danger:hover { background: rgba(255, 77, 106, 0.10); color: var(--danger); }
 .vi-action-icon { font-size: 13px; line-height: 1; }
 
 /* Empty state */

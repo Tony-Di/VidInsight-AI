@@ -98,6 +98,41 @@ public class VideoInfoServiceImpl extends ServiceImpl<VideoInfoMapper, VideoInfo
     }
 
     @Override
+    public void deleteVideo(Long id) {
+        VideoInfo videoInfo = getById(id);
+        if (videoInfo == null) {
+            throw new BusinessException(404, "video does not exist");
+        }
+
+        String sourceUrl = videoInfo.getSourceUrl();
+        String audioUrl = videoInfo.getAudioUrl();
+
+        removeById(id);
+
+        // 仅当没有其他记录引用同一物理文件时才删除（MD5 去重可能导致多条记录共用文件）
+        if (StringUtils.hasText(sourceUrl)) {
+            long sourceRefs = lambdaQuery().eq(VideoInfo::getSourceUrl, sourceUrl).count();
+            if (sourceRefs == 0) {
+                try {
+                    fileStorageService.deleteFile(sourceUrl);
+                } catch (Exception e) {
+                    log.warn("Failed to delete video file {}: {}", sourceUrl, e.getMessage());
+                }
+            }
+        }
+        if (StringUtils.hasText(audioUrl)) {
+            long audioRefs = lambdaQuery().eq(VideoInfo::getAudioUrl, audioUrl).count();
+            if (audioRefs == 0) {
+                try {
+                    fileStorageService.deleteFile(audioUrl);
+                } catch (Exception e) {
+                    log.warn("Failed to delete audio file {}: {}", audioUrl, e.getMessage());
+                }
+            }
+        }
+    }
+
+    @Override
     public VideoInfo analyzeVideo(Long id) {
         VideoInfo videoInfo = getById(id);
         if (videoInfo == null) {

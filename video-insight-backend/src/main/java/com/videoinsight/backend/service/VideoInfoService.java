@@ -17,4 +17,6 @@ public interface VideoInfoService extends IService<VideoInfo> {
     VideoInfo getVideoDetail(Long id);
 
     VideoInfo analyzeVideo(Long id);
+
+    void deleteVideo(Long id);
 }

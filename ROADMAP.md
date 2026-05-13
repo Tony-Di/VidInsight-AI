@@ -1,0 +1,86 @@
+# VidInsight-AI Roadmap
+
+按优先级和简历价值组织的功能列表。优先级 P0 最高，P3 最低。
+
+- **P0** — 现在就缺、影响功能完整性、必须做
+- **P1** — 高简历价值的技术栈扩展
+- **P2** — 中等价值、锦上添花
+- **P3** — 体验优化、可选
+
+---
+
+## P0：现在功能层面缺失（必做）
+
+| # | 功能 | 描述 | 涉及技术 | 工作量 |
+|---|------|------|---------|-------|
+| 1 | ~~删除视频~~ | ~~DELETE 接口，同时清理本地视频/音频文件，前端列表加删除按钮~~ | ~~Spring MVC、文件 IO~~ | **已完成** |
+| 2 | PROCESSING 卡死恢复 | `StartupRecoveryRunner` 扩展，启动时把 PROCESSING 重置为 FAILED（或重新入队） | Spring ApplicationRunner | 1 小时 |
+| 3 | ~~URL 导入 MD5 去重~~ | ~~下载完成后计算 MD5，命中已完成记录则复用，避免重复跑 ASR + AI~~ | ~~MyBatis-Plus~~ | **已完成** |
+| 4 | IMPORT_FAILED 重试 | 前端给 IMPORT_FAILED 状态加"重新导入"按钮，后端复用原 sourceUrl 重新提交 | 前端 + Spring MVC | 半天 |
+| 5 | 视频在线播放 | 前端 Modal 加 `<video>` 播放器，直接放 `/uploads/videos/*.mp4` | React + HTML5 video | 半天 |
+| 6 | 分页参数边界校验 | clamp page≥1、1≤pageSize≤100，防止 pageSize=99999999 压垮 DB | Spring Validation | 半小时 |
+| 7 | 定时清理失败/孤儿记录 | `@Scheduled` 任务每天清理 IMPORT_FAILED/FAILED 旧记录、孤儿文件、卡死中间状态 | Spring Scheduling、Cron | 1-2 小时 |
+
+---
+
+## P1：高简历价值技术栈扩展（重点做）
+
+| # | 功能 | 描述 | 涉及技术 | 工作量 | 简历价值 |
+|---|------|------|---------|-------|---------|
+| 7 | Redis 缓存层 | 视频详情 / 分页列表加缓存，Cache Aside 模式，解决缓存穿透（布隆过滤器或空值缓存）、击穿（互斥锁）、雪崩（随机过期时间） | Spring Data Redis、Lettuce | 1-2 天 | ★★★★★ |
+| 8 | Redis 分布式锁 | MD5 去重场景加分布式锁，防止两个相同视频同时上传各自走完整流水线；Redisson 实现 | Redisson、SETNX | 半天 | ★★★★★ |
+| 9 | Redis 限流 | 接口限流（如导入接口限制每用户每分钟 5 次），Lua 脚本实现令牌桶 | Redis Lua | 半天 | ★★★★ |
+| 10 | Redis 进度存储 | 替代之前讨论的"内存 Map"，把 yt-dlp 下载进度 / 分析进度存 Redis，前端轮询读取 | Redis Hash | 半天 | ★★★ |
+| 11 | 用户体系 + JWT | 注册/登录/BCrypt 密码加密、JWT Token、视频归属到用户、列表只返回本人视频 | Spring Security 或 Sa-Token、JWT、BCrypt | 2 天 | ★★★★★ |
+| 12 | MinIO 对象存储 | 把本地文件存储替换为 MinIO，前端直接通过预签名 URL 上传到 MinIO 绕过后端 | MinIO SDK、预签名 URL | 2 天 | ★★★★ |
+| 13 | WebSocket 实时推送 | 替代前端 2.4s 轮询，分析状态变化时主动推送给前端 | Spring WebSocket / STOMP | 1 天 | ★★★★ |
+| 14 | AI 总结流式输出 | SiliconFlow chat 接口改为 stream=true，后端用 SSE 推给前端，实现"打字机效果" | SSE、Reactive | 1 天 | ★★★★ |
+
+---
+
+## P2：中等价值（有时间就做）
+
+| # | 功能 | 描述 | 涉及技术 | 工作量 | 简历价值 |
+|---|------|------|---------|-------|---------|
+| 15 | Elasticsearch 搜索 | 对 transcript 和 summary 做全文搜索，高亮命中片段 | Elasticsearch、IK 分词器 | 2 天 | ★★★★ |
+| 16 | Docker 化 | 后端多阶段 Dockerfile、前端 nginx 镜像、完整 docker-compose 一键启动 | Docker、Docker Compose | 半天 | ★★★ |
+| 17 | GitHub Actions CI | 自动跑 mvnw test、构建镜像、推送到 GHCR | GitHub Actions | 半天 | ★★★ |
+| 18 | Prometheus + Grafana | Actuator 暴露 metrics，Grafana 展示请求 QPS / P99 延迟 / JVM 内存 | Spring Actuator、Micrometer | 1 天 | ★★★ |
+| 19 | 链路追踪 | OpenTelemetry / SkyWalking 追踪一次导入到分析完成的完整链路 | OpenTelemetry | 1 天 | ★★★★ |
+| 20 | 视频标签 / 分类 | 用户给视频打标签、按标签筛选 | MyBatis-Plus 多表关联 | 1 天 | ★★ |
+| 21 | 邮件通知 | 视频分析完成后发邮件提醒 | Spring Mail、模板引擎 | 半天 | ★★ |
+| 22 | 导出 transcript / summary | 导出为 Markdown 或 PDF 下载 | iText / 模板引擎 | 半天 | ★★ |
+
+---
+
+## P3：体验和打磨（最后）
+
+| # | 功能 | 描述 | 涉及技术 | 工作量 |
+|---|------|------|---------|-------|
+| 23 | transcript 带时间戳 | ASR 返回的不只是纯文本，还有每段的起止时间，点击文本可跳转视频播放位置 | 前端 video API | 1 天 |
+| 24 | 多语言 ASR | 支持中英日韩等多语言识别，前端选语言 | SiliconFlow 参数 | 半天 |
+| 25 | 视频缩略图 | ffmpeg 抽一帧作为列表缩略图 | ffmpeg | 半天 |
+| 26 | 摘要风格选择 | 简短摘要 / 详细笔记 / 思维导图 三种风格 | Prompt 工程 | 半天 |
+| 27 | 移动端响应式 | 现有 CSS 媒体查询已有基础，再优化 | CSS | 半天 |
+| 28 | 部署到公网 | 阿里云 ECS / Vercel + 域名 + HTTPS | 运维 | 1 天 |
+
+---
+
+## 建议的实施顺序
+
+如果以 NG 找工为目标，按以下顺序做收益最大：
+
+1. **第 1 周** — P0 全部做完（功能闭环）
+2. **第 2-3 周** — Redis 三件套（#7、#8、#9）+ 用户体系（#11），简历直接多两个加分项
+3. **第 4 周** — MinIO（#12）+ WebSocket（#13）+ AI 流式（#14），体验直接上一个台阶
+4. **第 5 周** — Docker（#16）+ CI（#17）+ 部署上线（#28），让面试官能扫码访问
+5. **后续** — 根据剩余时间挑 P2
+
+**简历项目描述模板**（按上面做完后可以这么写）：
+
+> **VidInsight-AI** — 基于 LLM 的视频内容分析平台
+> - 全栈实现：Spring Boot 3 + React 19 + MyBatis-Plus + MySQL + Redis + RabbitMQ + MinIO
+> - **高并发与缓存**：Redis 缓存视频元数据（Cache Aside + 布隆过滤器解决穿透 + 互斥锁解决击穿）；Redisson 分布式锁防止重复分析；Lua 脚本实现令牌桶限流
+> - **异步解耦**：RabbitMQ + 死信队列实现视频导入与 AI 分析两阶段解耦，启动时自动恢复中断任务
+> - **实时通信**：WebSocket 推送分析状态，SSE 流式输出 AI 摘要
+> - **生产级特性**：Docker 多阶段构建、GitHub Actions CI/CD、Prometheus + Grafana 监控、OpenTelemetry 链路追踪

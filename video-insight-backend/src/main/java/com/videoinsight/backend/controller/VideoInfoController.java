@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -70,5 +71,12 @@ public class VideoInfoController {
     @Operation(summary = "Submit video analysis task", description = "Marks the video as PROCESSING and submits the analysis task to a background thread pool.")
     public ApiResponse<VideoInfo> analyzeVideo(@Parameter(description = "Video id") @PathVariable Long id) {
         return ApiResponse.success(videoInfoService.analyzeVideo(id));
+    }
+
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Delete video", description = "Deletes the video record and the underlying file when no other record references it.")
+    public ApiResponse<Void> deleteVideo(@Parameter(description = "Video id") @PathVariable Long id) {
+        videoInfoService.deleteVideo(id);
+        return ApiResponse.success(null);
     }
 }

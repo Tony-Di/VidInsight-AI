@@ -177,6 +177,38 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
     }
 
     @Override
+    public void deleteFile(String sourceUrl) {
+        if (sourceUrl == null) {
+            return;
+        }
+
+        String rootDir;
+        String urlPrefix;
+        if (sourceUrl.startsWith(VIDEO_URL_PREFIX)) {
+            rootDir = videoDir;
+            urlPrefix = VIDEO_URL_PREFIX;
+        } else if (sourceUrl.startsWith(AUDIO_URL_PREFIX)) {
+            rootDir = audioDir;
+            urlPrefix = AUDIO_URL_PREFIX;
+        } else {
+            return; // 外部 URL 或未知前缀，静默忽略
+        }
+
+        String filename = sourceUrl.substring(urlPrefix.length());
+        Path rootPath = Path.of(rootDir).toAbsolutePath().normalize();
+        Path filePath = rootPath.resolve(filename).normalize();
+        if (!filePath.startsWith(rootPath)) {
+            throw new IllegalArgumentException("invalid file path");
+        }
+
+        try {
+            Files.deleteIfExists(filePath);
+        } catch (IOException exception) {
+            throw new IllegalStateException("failed to delete file " + filePath, exception);
+        }
+    }
+
+    @Override
     public Path resolveLocalPath(String sourceUrl) {
         if (sourceUrl == null) {
             throw new IllegalArgumentException("sourceUrl is required");

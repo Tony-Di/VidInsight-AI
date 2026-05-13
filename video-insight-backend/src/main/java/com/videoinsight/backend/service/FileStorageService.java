@@ -19,4 +19,10 @@ public interface FileStorageService {
     void deleteChunks(String uploadId);
 
     Path resolveLocalPath(String sourceUrl);
+
+    /**
+     * 删除本地上传的视频/音频文件。仅处理以 /uploads/ 开头的本地路径，
+     * 外部 URL（http/https）或文件不存在时静默忽略。
+     */
+    void deleteFile(String sourceUrl);
 }
