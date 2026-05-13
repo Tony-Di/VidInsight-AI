@@ -102,8 +102,15 @@ export async function uploadVideoChunked(
   return videoInfo;
 }
 
-export async function listVideos(): Promise<VideoInfo[]> {
-  return request<VideoInfo[]>('/api/videos');
+export interface PageResult<T> {
+  total: number;
+  page: number;
+  pageSize: number;
+  records: T[];
+}
+
+export async function listVideos(page = 1, pageSize = 10): Promise<PageResult<VideoInfo>> {
+  return request<PageResult<VideoInfo>>(`/api/videos?page=${page}&pageSize=${pageSize}`);
 }
 
 export async function getVideo(id: number): Promise<VideoInfo> {

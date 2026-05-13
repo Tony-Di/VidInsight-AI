@@ -68,8 +68,10 @@ public class YtDlpVideoDownloadServiceImpl implements VideoDownloadService {
         command.add(ytDlpProperties.getPath());
         command.add("--no-playlist");
         command.add("--no-check-certificate");
-        command.add("--recode-video");
+        command.add("--merge-output-format");
         command.add("mp4");
+        command.add("-f");
+        command.add("bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=720]+bestaudio/best[height<=720]");
         command.add("--user-agent");
         command.add("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
         command.add("-o");

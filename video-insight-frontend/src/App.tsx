@@ -11,6 +11,8 @@ import {
   type VideoStatus,
 } from './api';
 
+const PAGE_SIZE = 10;
+
 const { Dragger } = Upload;
 type Page = 'home' | 'workbench';
 type DetailTab = 'transcript' | 'summary';
@@ -170,6 +172,9 @@ function App() {
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [videos, setVideos] = useState<VideoInfo[]>([]);
   const [activeVideo, setActiveVideo] = useState<VideoInfo | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalVideos, setTotalVideos] = useState(0);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailTab, setDetailTab] = useState<DetailTab>('transcript');
   const [refreshing, setRefreshing] = useState(false);
@@ -195,14 +200,17 @@ function App() {
     setPage(nextPage);
   }, []);
 
-  const loadVideos = useCallback(async (silent = false) => {
+  const loadVideos = useCallback(async (targetPage: number, silent = false) => {
     if (!silent) setRefreshing(true);
     try {
-      const data = await listVideos();
-      setVideos(data);
+      const data = await listVideos(targetPage, PAGE_SIZE);
+      setVideos(data.records);
+      setCurrentPage(data.page);
+      setTotalPages(Math.ceil(data.total / PAGE_SIZE) || 1);
+      setTotalVideos(data.total);
       setActiveVideo((current) => {
-        if (!current) return data[0] ?? null;
-        return data.find((v) => v.id === current.id) ?? data[0] ?? null;
+        if (!current) return data.records[0] ?? null;
+        return data.records.find((v) => v.id === current.id) ?? data.records[0] ?? null;
       });
     } catch (error) {
       message.error(error instanceof Error ? error.message : t('msg_load_failed'));
@@ -218,7 +226,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (page === 'workbench') void loadVideos();
+    if (page === 'workbench') void loadVideos(1);
   }, [loadVideos, page]);
 
   useEffect(() => {
@@ -275,7 +283,7 @@ function App() {
       const created = await uploadVideoChunked(file, fileTitle || file.name, setUploadProgress);
       const analyzing = await analyzeVideo(created.id);
       setActiveVideo(analyzing);
-      await loadVideos(true);
+      await loadVideos(1, true);
       message.success(t('msg_submitted_file'));
       setFile(null);
       setFileTitle('');
@@ -294,7 +302,7 @@ function App() {
     try {
       const importing = await importVideoByUrl('Video link', sourceUrl.trim());
       setActiveVideo(importing);
-      await loadVideos(true);
+      await loadVideos(1, true);
       message.success(t('msg_submitted_url'));
       setSourceUrl('');
       navigateTo('workbench');
@@ -443,11 +451,11 @@ function App() {
       <div className="vi-wb-content">
         <div className="vi-wb-header">
           <span className="vi-wb-title">{t('wb_title')}</span>
-          <span className="vi-task-badge">{videos.length} {t('wb_tasks_suffix')}</span>
+          <span className="vi-task-badge">{totalVideos} {t('wb_tasks_suffix')}</span>
           <div className="vi-wb-actions">
             <button
               className="vi-icon-btn"
-              onClick={() => void loadVideos()}
+              onClick={() => void loadVideos(currentPage)}
               disabled={refreshing}
             >
               {refreshing ? t('wb_refreshing') : t('wb_refresh')}
@@ -552,6 +560,26 @@ function App() {
             ))
           )}
         </div>
+
+        {totalPages > 1 && (
+          <div className="vi-pagination">
+            <button
+              className="vi-icon-btn"
+              disabled={currentPage <= 1}
+              onClick={() => void loadVideos(currentPage - 1)}
+            >
+              ← PREV
+            </button>
+            <span className="vi-page-info">{currentPage} / {totalPages}</span>
+            <button
+              className="vi-icon-btn"
+              disabled={currentPage >= totalPages}
+              onClick={() => void loadVideos(currentPage + 1)}
+            >
+              NEXT →
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Detail modal */}

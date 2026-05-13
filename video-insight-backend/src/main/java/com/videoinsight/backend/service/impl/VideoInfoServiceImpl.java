@@ -1,6 +1,8 @@
 package com.videoinsight.backend.service.impl;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.videoinsight.backend.common.PageResult;
 import com.videoinsight.backend.entity.VideoInfo;
 import com.videoinsight.backend.enums.VideoStatus;
 import com.videoinsight.backend.exception.BusinessException;
@@ -18,7 +20,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Slf4j
 @Service
@@ -82,10 +83,11 @@ public class VideoInfoServiceImpl extends ServiceImpl<VideoInfoMapper, VideoInfo
     }
 
     @Override
-    public List<VideoInfo> listVideos() {
-        return lambdaQuery()
+    public PageResult<VideoInfo> listVideos(int page, int pageSize) {
+        Page<VideoInfo> result = lambdaQuery()
                 .orderByDesc(VideoInfo::getCreatedAt)
-                .list();
+                .page(new Page<>(page, pageSize));
+        return new PageResult<>(result.getTotal(), page, pageSize, result.getRecords());
     }
 
     @Override

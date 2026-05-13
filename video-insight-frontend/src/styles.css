@@ -612,6 +612,18 @@ body {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ── Pagination ──────────────────────────────────────────── */
+.vi-pagination {
+  display: flex; align-items: center; justify-content: center;
+  gap: 16px; margin-top: 24px;
+}
+
+.vi-page-info {
+  font-size: 12px; font-weight: 700;
+  color: var(--text-dim); letter-spacing: 0.06em;
+  min-width: 60px; text-align: center;
+}
+
 /* ── Responsive ──────────────────────────────────────────── */
 @media (max-width: 960px) {
   .vi-task-grid { grid-template-columns: repeat(2, 1fr); }

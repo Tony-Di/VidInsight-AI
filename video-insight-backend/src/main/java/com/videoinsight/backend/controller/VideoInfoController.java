@@ -1,6 +1,7 @@
 package com.videoinsight.backend.controller;
 
 import com.videoinsight.backend.common.ApiResponse;
+import com.videoinsight.backend.common.PageResult;
 import com.videoinsight.backend.entity.VideoInfo;
 import com.videoinsight.backend.model.request.VideoCreateRequest;
 import com.videoinsight.backend.model.request.VideoImportRequest;
@@ -21,8 +22,6 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/videos")
@@ -54,9 +53,11 @@ public class VideoInfoController {
     }
 
     @GetMapping
-    @Operation(summary = "List videos", description = "Returns all video records ordered by creation time descending.")
-    public ApiResponse<List<VideoInfo>> listVideos() {
-        return ApiResponse.success(videoInfoService.listVideos());
+    @Operation(summary = "List videos", description = "Returns paginated video records ordered by creation time descending.")
+    public ApiResponse<PageResult<VideoInfo>> listVideos(
+            @Parameter(description = "Page number, 1-based") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "Page size") @RequestParam(defaultValue = "10") int pageSize) {
+        return ApiResponse.success(videoInfoService.listVideos(page, pageSize));
     }
 
     @GetMapping("/{id}")
