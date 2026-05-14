@@ -16,12 +16,15 @@ import com.videoinsight.backend.service.VideoUploadTaskService;
 import com.videoinsight.backend.util.FileHashUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
@@ -29,9 +32,14 @@ import java.util.UUID;
 public class VideoUploadTaskServiceImpl extends ServiceImpl<VideoUploadTaskMapper, VideoUploadTask>
         implements VideoUploadTaskService {
 
+    private static final String MD5_LOCK_PREFIX = "vidinsight:lock:upload:md5:";
+    private static final long MD5_LOCK_WAIT_SECONDS = 10;
+
     private final VideoInfoMapper videoInfoMapper;
 
     private final FileStorageService fileStorageService;
+
+    private final RedissonClient redissonClient;
 
     @Override
     public ChunkUploadInitResponse initChunkUpload(ChunkUploadInitRequest request) {
@@ -116,18 +124,14 @@ public class VideoUploadTaskServiceImpl extends ServiceImpl<VideoUploadTaskMappe
                     uploadTask.getTotalChunks()
             );
 
-            // MD5 去重：合并完成后计算文件哈希，复用已有的分析结果
+            // MD5 去重:合并完成后计算文件哈希,复用已有的分析结果。
+            // 用 Redisson 分布式锁串行化"查 + 创建"过程,防止两个相同文件并发上传
+            // 同时通过 findCompletedByMd5 检查 + 各自 INSERT 一行,导致两条同 MD5 记录都跑 ASR/LLM
             String md5 = computeMd5OrNull(fileStorageService.resolveLocalPath(sourceUrl));
             if (md5 != null) {
-                VideoInfo existing = videoInfoMapper.findCompletedByMd5(md5);
-                if (existing != null) {
-                    log.info("Duplicate video detected (md5={}), reusing result from videoId={}", md5, existing.getId());
-                    uploadTask.setStatus(UploadTaskStatus.COMPLETED);
-                    uploadTask.setUpdatedAt(LocalDateTime.now());
-                    updateById(uploadTask);
-                    fileStorageService.deleteChunks(uploadTask.getUploadId());
-                    return existing;
-                }
+                VideoInfo videoInfo = upsertWithMd5Lock(uploadTask, sourceUrl, md5);
+                fileStorageService.deleteChunks(uploadTask.getUploadId());
+                return videoInfo;
             }
 
             VideoInfo videoInfo = createVideoInfo(uploadTask, sourceUrl, md5);
@@ -145,6 +149,37 @@ public class VideoUploadTaskServiceImpl extends ServiceImpl<VideoUploadTaskMappe
             uploadTask.setUpdatedAt(LocalDateTime.now());
             updateById(uploadTask);
             throw new IllegalStateException("failed to complete chunk upload", exception);
+        }
+    }
+
+    private VideoInfo upsertWithMd5Lock(VideoUploadTask uploadTask, String sourceUrl, String md5) {
+        RLock lock = redissonClient.getLock(MD5_LOCK_PREFIX + md5);
+        boolean acquired = false;
+        try {
+            acquired = lock.tryLock(MD5_LOCK_WAIT_SECONDS, TimeUnit.SECONDS);
+            if (!acquired) {
+                throw new IllegalStateException("MD5 dedup lock busy, please retry: md5=" + md5);
+            }
+            VideoInfo existing = videoInfoMapper.findCompletedByMd5(md5);
+            if (existing != null) {
+                log.info("Duplicate video detected (md5={}), reusing result from videoId={}", md5, existing.getId());
+                uploadTask.setStatus(UploadTaskStatus.COMPLETED);
+                uploadTask.setUpdatedAt(LocalDateTime.now());
+                updateById(uploadTask);
+                return existing;
+            }
+            VideoInfo videoInfo = createVideoInfo(uploadTask, sourceUrl, md5);
+            uploadTask.setStatus(UploadTaskStatus.COMPLETED);
+            uploadTask.setUpdatedAt(LocalDateTime.now());
+            updateById(uploadTask);
+            return videoInfo;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("interrupted while waiting for MD5 dedup lock", e);
+        } finally {
+            if (acquired && lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
         }
     }
 

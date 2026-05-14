@@ -29,4 +29,11 @@ public class HealthController {
     public ApiResponse<String> redis() {
         return ApiResponse.success(healthService.checkRedis());
     }
+
+    @GetMapping("/health/redisson")
+    @Operation(summary = "Check Redisson connectivity",
+            description = "Acquires and releases a probe lock to verify the Redisson client is wired.")
+    public ApiResponse<String> redisson() {
+        return ApiResponse.success(healthService.checkRedisson());
+    }
 }

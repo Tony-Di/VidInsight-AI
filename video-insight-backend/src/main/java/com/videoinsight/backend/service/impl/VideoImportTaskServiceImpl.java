@@ -10,6 +10,8 @@ import com.videoinsight.backend.service.VideoImportTaskService;
 import com.videoinsight.backend.util.FileHashUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -17,6 +19,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
@@ -27,9 +30,14 @@ public class VideoImportTaskServiceImpl implements VideoImportTaskService {
 
     private final VideoDownloadService videoDownloadService;
 
+    private static final String MD5_LOCK_PREFIX = "vidinsight:lock:upload:md5:";
+    private static final long MD5_LOCK_WAIT_SECONDS = 10;
+
     private final FileStorageService fileStorageService;
 
     private final VideoCacheService videoCacheService;
+
+    private final RedissonClient redissonClient;
 
     @Async("analysisTaskExecutor")
     @Override
@@ -44,24 +52,11 @@ public class VideoImportTaskServiceImpl implements VideoImportTaskService {
         try {
             downloadedFile = videoDownloadService.download(sourceUrl);
 
-            // MD5 去重：下载完成后算哈希，命中已完成记录则复用其 ASR + AI 结果
+            // MD5 去重:下载完成后算哈希,命中已完成记录则复用其 ASR + AI 结果。
+            // Redisson 锁串行化"查 + 决策",防止两个相同 URL 并发导入时各跑一遍 ASR/LLM。
             String md5 = computeMd5OrNull(downloadedFile);
-            if (md5 != null) {
-                VideoInfo existing = videoInfoMapper.findCompletedByMd5(md5);
-                if (existing != null) {
-                    log.info("Duplicate video detected on URL import (md5={}), reusing result from videoId={}",
-                            md5, existing.getId());
-                    videoInfo.setFileMd5(md5);
-                    videoInfo.setSourceUrl(existing.getSourceUrl());
-                    videoInfo.setAudioUrl(existing.getAudioUrl());
-                    videoInfo.setTranscript(existing.getTranscript());
-                    videoInfo.setSummary(existing.getSummary());
-                    videoInfo.setVideoStatus(VideoStatus.COMPLETED);
-                    videoInfo.setUpdatedAt(LocalDateTime.now());
-                    videoInfoMapper.updateById(videoInfo);
-                    videoCacheService.evictDetail(videoInfo.getId());
-                    return;
-                }
+            if (md5 != null && reuseIfDuplicate(videoInfo, md5)) {
+                return;
             }
 
             String localSourceUrl = fileStorageService.saveVideo(downloadedFile, downloadedFile.getFileName().toString());
@@ -82,6 +77,45 @@ public class VideoImportTaskServiceImpl implements VideoImportTaskService {
             videoCacheService.evictDetail(videoInfo.getId());
         } finally {
             deleteTempFile(downloadedFile);
+        }
+    }
+
+    /**
+     * 锁内执行:查 COMPLETED 同 MD5 的记录,命中就把当前 video 写成 COMPLETED 复用其结果。
+     * @return true 表示已复用并写库,调用方应直接 return
+     */
+    private boolean reuseIfDuplicate(VideoInfo videoInfo, String md5) {
+        RLock lock = redissonClient.getLock(MD5_LOCK_PREFIX + md5);
+        boolean acquired = false;
+        try {
+            acquired = lock.tryLock(MD5_LOCK_WAIT_SECONDS, TimeUnit.SECONDS);
+            if (!acquired) {
+                log.warn("MD5 dedup lock busy for md5={}, skipping reuse check and proceeding to PENDING", md5);
+                return false;
+            }
+            VideoInfo existing = videoInfoMapper.findCompletedByMd5(md5);
+            if (existing == null) {
+                return false;
+            }
+            log.info("Duplicate video detected on URL import (md5={}), reusing result from videoId={}",
+                    md5, existing.getId());
+            videoInfo.setFileMd5(md5);
+            videoInfo.setSourceUrl(existing.getSourceUrl());
+            videoInfo.setAudioUrl(existing.getAudioUrl());
+            videoInfo.setTranscript(existing.getTranscript());
+            videoInfo.setSummary(existing.getSummary());
+            videoInfo.setVideoStatus(VideoStatus.COMPLETED);
+            videoInfo.setUpdatedAt(LocalDateTime.now());
+            videoInfoMapper.updateById(videoInfo);
+            videoCacheService.evictDetail(videoInfo.getId());
+            return true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("interrupted while waiting for MD5 dedup lock", e);
+        } finally {
+            if (acquired && lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
         }
     }
 

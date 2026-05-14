@@ -4,6 +4,7 @@ import com.videoinsight.backend.common.PageResult;
 import com.videoinsight.backend.entity.VideoInfo;
 
 import java.util.Optional;
+import java.util.function.Supplier;
 
 public interface VideoCacheService {
 
@@ -16,6 +17,12 @@ public interface VideoCacheService {
      * </ul>
      */
     Optional<VideoInfo> getDetail(Long id);
+
+    /**
+     * 防击穿版本:缓存命中直接返回;miss 时用分布式锁互斥回源,
+     * 保证同一时刻只有一个线程执行 dbLoader,其它线程等结果。
+     */
+    VideoInfo getDetailOrLoad(Long id, Supplier<VideoInfo> dbLoader);
 
     void setDetail(Long id, VideoInfo videoInfo);
 

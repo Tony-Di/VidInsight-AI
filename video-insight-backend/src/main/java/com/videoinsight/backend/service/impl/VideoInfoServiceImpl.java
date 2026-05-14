@@ -21,7 +21,6 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 @Slf4j
 @Service
@@ -108,18 +107,9 @@ public class VideoInfoServiceImpl extends ServiceImpl<VideoInfoMapper, VideoInfo
 
     @Override
     public VideoInfo getVideoDetail(Long id) {
-        // 三态:null=cache miss(回源);Optional.empty()=命中"不存在"哨兵(直接返回 null);Optional.of=命中真数据
-        Optional<VideoInfo> cached = videoCacheService.getDetail(id);
-        if (cached != null) {
-            return cached.orElse(null);
-        }
-        VideoInfo db = getById(id);
-        if (db != null) {
-            videoCacheService.setDetail(id, db);
-        } else {
-            videoCacheService.markDetailMissing(id);
-        }
-        return db;
+        // Cache Aside + 防穿透(空值哨兵)+ 防击穿(回源互斥锁)+ 防雪崩(TTL 抖动)
+        // 这一行背后融合了 #7 的全部四种防御
+        return videoCacheService.getDetailOrLoad(id, () -> getById(id));
     }
 
     @Override
