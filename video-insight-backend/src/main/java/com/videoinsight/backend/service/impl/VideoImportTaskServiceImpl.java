@@ -4,6 +4,7 @@ import com.videoinsight.backend.entity.VideoInfo;
 import com.videoinsight.backend.enums.VideoStatus;
 import com.videoinsight.backend.mapper.VideoInfoMapper;
 import com.videoinsight.backend.service.FileStorageService;
+import com.videoinsight.backend.service.VideoCacheService;
 import com.videoinsight.backend.service.VideoDownloadService;
 import com.videoinsight.backend.service.VideoImportTaskService;
 import com.videoinsight.backend.util.FileHashUtil;
@@ -27,6 +28,8 @@ public class VideoImportTaskServiceImpl implements VideoImportTaskService {
     private final VideoDownloadService videoDownloadService;
 
     private final FileStorageService fileStorageService;
+
+    private final VideoCacheService videoCacheService;
 
     @Async("analysisTaskExecutor")
     @Override
@@ -56,6 +59,7 @@ public class VideoImportTaskServiceImpl implements VideoImportTaskService {
                     videoInfo.setVideoStatus(VideoStatus.COMPLETED);
                     videoInfo.setUpdatedAt(LocalDateTime.now());
                     videoInfoMapper.updateById(videoInfo);
+                    videoCacheService.evictDetail(videoInfo.getId());
                     return;
                 }
             }
@@ -68,12 +72,14 @@ public class VideoImportTaskServiceImpl implements VideoImportTaskService {
             videoInfo.setSummary(null);
             videoInfo.setUpdatedAt(LocalDateTime.now());
             videoInfoMapper.updateById(videoInfo);
+            videoCacheService.evictDetail(videoInfo.getId());
         } catch (Exception exception) {
             log.error("Video import failed, videoId={}", videoId, exception);
             videoInfo.setVideoStatus(VideoStatus.IMPORT_FAILED);
             videoInfo.setSummary(getRootCauseMessage(exception));
             videoInfo.setUpdatedAt(LocalDateTime.now());
             videoInfoMapper.updateById(videoInfo);
+            videoCacheService.evictDetail(videoInfo.getId());
         } finally {
             deleteTempFile(downloadedFile);
         }

@@ -6,6 +6,7 @@ import com.videoinsight.backend.enums.VideoStatus;
 import com.videoinsight.backend.exception.BusinessException;
 import com.videoinsight.backend.mapper.VideoInfoMapper;
 import com.videoinsight.backend.model.request.VideoImportRequest;
+import com.videoinsight.backend.service.VideoCacheService;
 import com.videoinsight.backend.service.VideoImportService;
 import com.videoinsight.backend.service.VideoImportTaskService;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,8 @@ import java.time.LocalDateTime;
 public class VideoImportServiceImpl extends ServiceImpl<VideoInfoMapper, VideoInfo> implements VideoImportService {
 
     private final VideoImportTaskService videoImportTaskService;
+
+    private final VideoCacheService videoCacheService;
 
     @Override
     public VideoInfo importVideo(VideoImportRequest request) {
@@ -56,6 +59,7 @@ public class VideoImportServiceImpl extends ServiceImpl<VideoInfoMapper, VideoIn
         videoInfo.setSummary(null);
         videoInfo.setUpdatedAt(LocalDateTime.now());
         updateById(videoInfo);
+        videoCacheService.evictDetail(videoInfo.getId());
 
         videoImportTaskService.submitImport(videoInfo.getId(), originalUrl);
         return videoInfo;

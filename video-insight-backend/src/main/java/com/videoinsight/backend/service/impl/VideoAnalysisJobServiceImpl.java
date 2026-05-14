@@ -6,6 +6,7 @@ import com.videoinsight.backend.mapper.VideoInfoMapper;
 import com.videoinsight.backend.model.response.VideoAnalysisResult;
 import com.videoinsight.backend.service.VideoAnalysisJobService;
 import com.videoinsight.backend.service.VideoAnalysisService;
+import com.videoinsight.backend.service.VideoCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,8 @@ public class VideoAnalysisJobServiceImpl implements VideoAnalysisJobService {
     private final VideoInfoMapper videoInfoMapper;
 
     private final VideoAnalysisService videoAnalysisService;
+
+    private final VideoCacheService videoCacheService;
 
     @Override
     public void executeAnalysis(Long videoId) {
@@ -43,12 +46,14 @@ public class VideoAnalysisJobServiceImpl implements VideoAnalysisJobService {
             videoInfo.setSummary(result.getSummary());
             videoInfo.setUpdatedAt(LocalDateTime.now());
             videoInfoMapper.updateById(videoInfo);
+            videoCacheService.evictDetail(videoId);
         } catch (Exception exception) {
             log.error("Video analysis failed, videoId={}", videoId, exception);
             videoInfo.setVideoStatus(VideoStatus.FAILED);
             videoInfo.setSummary(getRootCauseMessage(exception));
             videoInfo.setUpdatedAt(LocalDateTime.now());
             videoInfoMapper.updateById(videoInfo);
+            videoCacheService.evictDetail(videoId);
         }
     }
 

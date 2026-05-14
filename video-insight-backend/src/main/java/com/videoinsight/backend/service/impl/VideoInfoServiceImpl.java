@@ -9,6 +9,7 @@ import com.videoinsight.backend.mapper.VideoInfoMapper;
 import com.videoinsight.backend.model.request.VideoCreateRequest;
 import com.videoinsight.backend.service.FileStorageService;
 import com.videoinsight.backend.service.VideoAnalysisTaskService;
+import com.videoinsight.backend.service.VideoCacheService;
 import com.videoinsight.backend.service.VideoInfoService;
 import com.videoinsight.backend.util.FileHashUtil;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -29,6 +31,8 @@ public class VideoInfoServiceImpl extends ServiceImpl<VideoInfoMapper, VideoInfo
     private final FileStorageService fileStorageService;
 
     private final VideoAnalysisTaskService videoAnalysisTaskService;
+
+    private final VideoCacheService videoCacheService;
 
     @Override
     public VideoInfo createVideo(VideoCreateRequest request) {
@@ -86,17 +90,36 @@ public class VideoInfoServiceImpl extends ServiceImpl<VideoInfoMapper, VideoInfo
     public PageResult<VideoInfo> listVideos(int page, int pageSize) {
         int safePage = Math.max(1, page);
         int safePageSize = Math.min(100, Math.max(1, pageSize));
+
+        PageResult<VideoInfo> cached = videoCacheService.getList(safePage, safePageSize);
+        if (cached != null) {
+            return cached;
+        }
+
         long total = lambdaQuery().count();
         List<VideoInfo> records = lambdaQuery()
                 .orderByDesc(VideoInfo::getCreatedAt)
                 .last("LIMIT " + safePageSize + " OFFSET " + (long) (safePage - 1) * safePageSize)
                 .list();
-        return new PageResult<>(total, safePage, safePageSize, records);
+        PageResult<VideoInfo> result = new PageResult<>(total, safePage, safePageSize, records);
+        videoCacheService.setList(safePage, safePageSize, result);
+        return result;
     }
 
     @Override
     public VideoInfo getVideoDetail(Long id) {
-        return getById(id);
+        // 三态:null=cache miss(回源);Optional.empty()=命中"不存在"哨兵(直接返回 null);Optional.of=命中真数据
+        Optional<VideoInfo> cached = videoCacheService.getDetail(id);
+        if (cached != null) {
+            return cached.orElse(null);
+        }
+        VideoInfo db = getById(id);
+        if (db != null) {
+            videoCacheService.setDetail(id, db);
+        } else {
+            videoCacheService.markDetailMissing(id);
+        }
+        return db;
     }
 
     @Override
@@ -110,6 +133,7 @@ public class VideoInfoServiceImpl extends ServiceImpl<VideoInfoMapper, VideoInfo
         String audioUrl = videoInfo.getAudioUrl();
 
         removeById(id);
+        videoCacheService.evictDetail(id);
 
         // 仅当没有其他记录引用同一物理文件时才删除（MD5 去重可能导致多条记录共用文件）
         if (StringUtils.hasText(sourceUrl)) {
@@ -148,6 +172,7 @@ public class VideoInfoServiceImpl extends ServiceImpl<VideoInfoMapper, VideoInfo
         videoInfo.setVideoStatus(VideoStatus.PROCESSING);
         videoInfo.setUpdatedAt(LocalDateTime.now());
         updateById(videoInfo);
+        videoCacheService.evictDetail(videoInfo.getId());
 
         videoAnalysisTaskService.submitAnalysis(videoInfo.getId());
 

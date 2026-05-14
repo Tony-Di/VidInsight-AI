@@ -22,4 +22,11 @@ public class HealthController {
     public ApiResponse<String> health() {
         return ApiResponse.success(healthService.check());
     }
+
+    @GetMapping("/health/redis")
+    @Operation(summary = "Check Redis connectivity",
+            description = "Writes a key with 30s TTL and reads it back to verify Redis round-trip.")
+    public ApiResponse<String> redis() {
+        return ApiResponse.success(healthService.checkRedis());
+    }
 }
