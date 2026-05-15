@@ -101,6 +101,9 @@ const TRANSLATIONS = {
     msg_delete_confirm_content: '此操作不可撤销,视频文件和分析结果都将被删除。',
     msg_cancel_confirm_title: '确认取消分析?',
     msg_cancel_confirm_content: '当前分析任务及其视频记录将被移除。',
+    msg_logout_confirm_title: '退出登录?',
+    msg_logout_confirm_content: '退出后需要重新登录才能回到工作台。',
+    msg_logout_ok: '退出',
     msg_delete_ok: '删除',
     msg_delete_cancel: '取消',
     msg_delete_success: '已删除',
@@ -185,6 +188,10 @@ const TRANSLATIONS = {
     msg_cancel_confirm_title: 'Cancel this analysis?',
     msg_cancel_confirm_content:
       'The running analysis task and its video record will be removed.',
+    msg_logout_confirm_title: 'Log out?',
+    msg_logout_confirm_content:
+      "You'll need to sign in again to return to your workbench.",
+    msg_logout_ok: 'Log out',
     msg_delete_ok: 'Delete',
     msg_delete_cancel: 'Cancel',
     msg_delete_success: 'Deleted',
@@ -903,12 +910,19 @@ function AppInner({ user, onLogout }: AppInnerProps) {
 
         <button
           className="vi-account-btn btn-lift"
-          title={`${user.displayName || user.email} — click to log out`}
-          aria-label="Log out"
+          title={user.displayName || user.email}
+          aria-label={t('msg_logout_ok')}
           onClick={() => {
-            if (window.confirm(`Log out ${user.displayName || user.email}?`)) {
-              onLogout();
-            }
+            Modal.confirm({
+              title: t('msg_logout_confirm_title'),
+              content: t('msg_logout_confirm_content'),
+              okText: t('msg_logout_ok'),
+              cancelText: t('msg_delete_cancel'),
+              okButtonProps: { danger: true },
+              onOk: () => {
+                onLogout();
+              },
+            });
           }}
         >
           {(user.displayName || user.email).slice(0, 2).toUpperCase()}

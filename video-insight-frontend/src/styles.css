@@ -1356,11 +1356,6 @@ body:hover .cursor-glow,
   color: var(--text) !important;
 }
 
-.ant-modal-confirm .ant-modal-content {
-  background: var(--surface) !important;
-  border: 1px solid var(--line-2) !important;
-}
-
 /* ── Responsive ──────────────────────────────────────────── */
 @media (max-width: 720px) {
   .vi-hero { padding-top: 48px; padding-bottom: 24px; }
