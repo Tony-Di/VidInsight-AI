@@ -344,6 +344,7 @@ body::after {
   transition: opacity 800ms ease;
   will-change: transform;
 }
+body:hover .cursor-glow,
 .cursor-glow.is-armed { opacity: 1; }
 
 /* Hero subtle parallax — uses normalized --px/--py from :root */
@@ -358,8 +359,10 @@ body::after {
 }
 
 /* Upload card — mouse-aware edge highlight + soft spot.
-   --cmx / --cmy are set in JS as pixel offsets relative to the card. */
-.glow-host { position: relative; }
+   --cmx / --cmy are set in JS as pixel offsets relative to the card.
+   `isolation: isolate` creates a stacking context so the glow layers reliably
+   paint above inner panel content (which would otherwise occlude them). */
+.glow-host { position: relative; isolation: isolate; }
 .glow-host > .glow-border,
 .glow-host > .glow-spot {
   pointer-events: none;
@@ -384,6 +387,7 @@ body::after {
     linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
+  z-index: 3;
 }
 .glow-host > .glow-spot {
   position: absolute;
@@ -394,6 +398,7 @@ body::after {
     oklch(0.78 0.13 70 / 0.06),
     transparent 70%
   );
+  z-index: 2;
 }
 .glow-host:hover > .glow-border,
 .glow-host:hover > .glow-spot { opacity: 1; }
