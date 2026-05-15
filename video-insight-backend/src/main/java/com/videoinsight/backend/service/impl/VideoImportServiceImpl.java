@@ -6,6 +6,7 @@ import com.videoinsight.backend.enums.VideoStatus;
 import com.videoinsight.backend.exception.BusinessException;
 import com.videoinsight.backend.mapper.VideoInfoMapper;
 import com.videoinsight.backend.model.request.VideoImportRequest;
+import com.videoinsight.backend.security.SecurityUtil;
 import com.videoinsight.backend.service.VideoCacheService;
 import com.videoinsight.backend.service.VideoImportService;
 import com.videoinsight.backend.service.VideoImportTaskService;
@@ -25,9 +26,11 @@ public class VideoImportServiceImpl extends ServiceImpl<VideoInfoMapper, VideoIn
 
     @Override
     public VideoInfo importVideo(VideoImportRequest request) {
+        Long userId = SecurityUtil.currentUserId();
         LocalDateTime now = LocalDateTime.now();
 
         VideoInfo videoInfo = new VideoInfo();
+        videoInfo.setUserId(userId);
         videoInfo.setTitle(StringUtils.hasText(request.getTitle()) ? request.getTitle() : request.getSourceUrl());
         videoInfo.setSourceUrl(request.getSourceUrl());
         videoInfo.setVideoStatus(VideoStatus.IMPORTING);
@@ -35,16 +38,20 @@ public class VideoImportServiceImpl extends ServiceImpl<VideoInfoMapper, VideoIn
         videoInfo.setUpdatedAt(now);
 
         save(videoInfo);
-        videoCacheService.evictAllLists();
+        videoCacheService.evictUserLists(userId);
         videoImportTaskService.submitImport(videoInfo.getId(), request.getSourceUrl());
         return videoInfo;
     }
 
     @Override
     public VideoInfo retryImport(Long id) {
+        Long userId = SecurityUtil.currentUserId();
         VideoInfo videoInfo = getById(id);
         if (videoInfo == null) {
             throw new BusinessException(404, "video does not exist");
+        }
+        if (!userId.equals(videoInfo.getUserId())) {
+            throw new BusinessException(403, "you do not own this video");
         }
         if (videoInfo.getVideoStatus() != VideoStatus.IMPORT_FAILED) {
             throw new BusinessException(400, "only IMPORT_FAILED videos can be retried");
@@ -61,7 +68,7 @@ public class VideoImportServiceImpl extends ServiceImpl<VideoInfoMapper, VideoIn
         videoInfo.setUpdatedAt(LocalDateTime.now());
         updateById(videoInfo);
         videoCacheService.evictDetail(videoInfo.getId());
-        videoCacheService.evictAllLists();
+        videoCacheService.evictUserLists(userId);
 
         videoImportTaskService.submitImport(videoInfo.getId(), originalUrl);
         return videoInfo;

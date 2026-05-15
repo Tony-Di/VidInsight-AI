@@ -19,6 +19,9 @@ public class VideoInfo {
     @Schema(description = "Video id.", example = "1")
     private Long id;
 
+    @Schema(description = "Owner user id (app_user.id).", example = "42")
+    private Long userId;
+
     @Schema(description = "Video title.", example = "Product demo video")
     private String title;
 

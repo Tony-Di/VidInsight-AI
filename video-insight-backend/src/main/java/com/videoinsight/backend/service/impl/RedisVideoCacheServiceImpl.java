@@ -26,7 +26,7 @@ import java.util.function.Supplier;
 public class RedisVideoCacheServiceImpl implements VideoCacheService {
 
     private static final String DETAIL_KEY_PREFIX = "vidinsight:video:detail:";
-    private static final String LIST_KEY_PREFIX = "vidinsight:video:list:";
+    private static final String LIST_KEY_PREFIX = "vidinsight:video:list:user:";
     private static final String DETAIL_LOCK_PREFIX = "vidinsight:lock:video:detail:";
 
     /** 等不到锁的超时时间——避免回源失败时所有线程被无限拖住。 */
@@ -138,31 +138,32 @@ public class RedisVideoCacheServiceImpl implements VideoCacheService {
 
     @Override
     @SuppressWarnings("unchecked")
-    public PageResult<VideoInfo> getList(int page, int pageSize) {
+    public PageResult<VideoInfo> getList(Long userId, int page, int pageSize) {
         try {
-            return (PageResult<VideoInfo>) redisTemplate.opsForValue().get(listKey(page, pageSize));
+            return (PageResult<VideoInfo>) redisTemplate.opsForValue().get(listKey(userId, page, pageSize));
         } catch (Exception e) {
-            log.warn("Redis getList failed for page={} size={}, fall back to DB: {}",
-                    page, pageSize, e.getMessage());
+            log.warn("Redis getList failed for user={} page={} size={}, fall back to DB: {}",
+                    userId, page, pageSize, e.getMessage());
             return null;
         }
     }
 
     @Override
-    public void setList(int page, int pageSize, PageResult<VideoInfo> result) {
+    public void setList(Long userId, int page, int pageSize, PageResult<VideoInfo> result) {
         try {
-            redisTemplate.opsForValue().set(listKey(page, pageSize), result, jitter(LIST_TTL_BASE, LIST_TTL_JITTER_SECONDS));
+            redisTemplate.opsForValue().set(listKey(userId, page, pageSize), result, jitter(LIST_TTL_BASE, LIST_TTL_JITTER_SECONDS));
         } catch (Exception e) {
-            log.warn("Redis setList failed for page={} size={}: {}", page, pageSize, e.getMessage());
+            log.warn("Redis setList failed for user={} page={} size={}: {}", userId, page, pageSize, e.getMessage());
         }
     }
 
     @Override
-    public void evictAllLists() {
+    public void evictUserLists(Long userId) {
         try {
             // 用 SCAN 而不是 KEYS:KEYS 在大数据集上会阻塞整个 Redis,SCAN 是游标式遍历不阻塞。
+            // 只清当前用户的 list key:vidinsight:video:list:user:{userId}:*
             ScanOptions options = ScanOptions.scanOptions()
-                    .match(LIST_KEY_PREFIX + "*")
+                    .match(LIST_KEY_PREFIX + userId + ":*")
                     .count(100)
                     .build();
             List<String> matched = new ArrayList<>();
@@ -175,7 +176,7 @@ public class RedisVideoCacheServiceImpl implements VideoCacheService {
                 redisTemplate.delete(matched);
             }
         } catch (Exception e) {
-            log.warn("Redis evictAllLists failed: {}", e.getMessage());
+            log.warn("Redis evictUserLists failed for user={}: {}", userId, e.getMessage());
         }
     }
 
@@ -183,8 +184,8 @@ public class RedisVideoCacheServiceImpl implements VideoCacheService {
         return DETAIL_KEY_PREFIX + id;
     }
 
-    private String listKey(int page, int pageSize) {
-        return LIST_KEY_PREFIX + page + ":" + pageSize;
+    private String listKey(Long userId, int page, int pageSize) {
+        return LIST_KEY_PREFIX + userId + ":" + page + ":" + pageSize;
     }
 
     /** 在 base 上加 [0, jitterSeconds] 之间的随机秒数,防止大量 key 同时过期。 */

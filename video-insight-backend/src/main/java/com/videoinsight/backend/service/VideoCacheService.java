@@ -33,14 +33,15 @@ public interface VideoCacheService {
 
     void evictDetail(Long id);
 
-    PageResult<VideoInfo> getList(int page, int pageSize);
+    PageResult<VideoInfo> getList(Long userId, int page, int pageSize);
 
-    void setList(int page, int pageSize, PageResult<VideoInfo> result);
+    void setList(Long userId, int page, int pageSize, PageResult<VideoInfo> result);
 
     /**
-     * 删除所有分页列表缓存。任何会改变列表内容的写操作（新增/删除/状态变化）都要调用，
+     * 删除指定用户的所有分页列表缓存。任何会改变该用户列表内容的写操作（新增/删除/状态变化）都要调用，
      * 否则会出现"DB 已改 → 列表缓存仍是旧数据"的脏读，导致前端误操作（例如重复删除 404）。
+     * 只清当前用户的列表 key 而非全用户的,避免一个用户的写操作影响所有人的缓存命中率。
      * 实现使用 SCAN 而非 KEYS,避免在生产 Redis 上阻塞。
      */
-    void evictAllLists();
+    void evictUserLists(Long userId);
 }

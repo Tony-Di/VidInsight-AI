@@ -11,6 +11,7 @@ import com.videoinsight.backend.mapper.VideoUploadTaskMapper;
 import com.videoinsight.backend.model.request.ChunkUploadInitRequest;
 import com.videoinsight.backend.model.response.ChunkUploadInitResponse;
 import com.videoinsight.backend.model.response.ChunkUploadResponse;
+import com.videoinsight.backend.security.SecurityUtil;
 import com.videoinsight.backend.service.FileStorageService;
 import com.videoinsight.backend.service.VideoCacheService;
 import com.videoinsight.backend.service.VideoUploadTaskService;
@@ -46,12 +47,14 @@ public class VideoUploadTaskServiceImpl extends ServiceImpl<VideoUploadTaskMappe
 
     @Override
     public ChunkUploadInitResponse initChunkUpload(ChunkUploadInitRequest request) {
+        Long userId = SecurityUtil.currentUserId();
         fileStorageService.validateVideoFilename(request.getFileName());
 
         LocalDateTime now = LocalDateTime.now();
         String uploadId = UUID.randomUUID().toString();
 
         VideoUploadTask uploadTask = new VideoUploadTask();
+        uploadTask.setUserId(userId);
         uploadTask.setUploadId(uploadId);
         uploadTask.setTitle(request.getTitle());
         uploadTask.setFileName(request.getFileName());
@@ -77,11 +80,15 @@ public class VideoUploadTaskServiceImpl extends ServiceImpl<VideoUploadTaskMappe
             throw new IllegalArgumentException("chunk file is required");
         }
 
+        Long userId = SecurityUtil.currentUserId();
         VideoUploadTask uploadTask = lambdaQuery()
                 .eq(VideoUploadTask::getUploadId, uploadId)
                 .one();
         if (uploadTask == null) {
             throw new BusinessException(404, "upload task does not exist");
+        }
+        if (!userId.equals(uploadTask.getUserId())) {
+            throw new BusinessException(403, "you do not own this upload task");
         }
         if (uploadTask.getStatus() != UploadTaskStatus.UPLOADING) {
             throw new BusinessException(400, "upload task is not uploading");
@@ -110,11 +117,15 @@ public class VideoUploadTaskServiceImpl extends ServiceImpl<VideoUploadTaskMappe
             throw new IllegalArgumentException("uploadId is required");
         }
 
+        Long userId = SecurityUtil.currentUserId();
         VideoUploadTask uploadTask = lambdaQuery()
                 .eq(VideoUploadTask::getUploadId, uploadId)
                 .one();
         if (uploadTask == null) {
             throw new BusinessException(404, "upload task does not exist");
+        }
+        if (!userId.equals(uploadTask.getUserId())) {
+            throw new BusinessException(403, "you do not own this upload task");
         }
         if (uploadTask.getStatus() != UploadTaskStatus.UPLOADING) {
             throw new BusinessException(400, "upload task is not uploading");
@@ -163,9 +174,11 @@ public class VideoUploadTaskServiceImpl extends ServiceImpl<VideoUploadTaskMappe
             if (!acquired) {
                 throw new IllegalStateException("MD5 dedup lock busy, please retry: md5=" + md5);
             }
-            VideoInfo existing = videoInfoMapper.findCompletedByMd5(md5);
+            // MD5 复用按用户限定:不复用别人的已分析结果(隐私 + 所有权)。
+            VideoInfo existing = videoInfoMapper.findCompletedByMd5AndUser(md5, uploadTask.getUserId());
             if (existing != null) {
-                log.info("Duplicate video detected (md5={}), reusing result from videoId={}", md5, existing.getId());
+                log.info("Duplicate video detected (md5={}, userId={}), reusing result from videoId={}",
+                        md5, uploadTask.getUserId(), existing.getId());
                 uploadTask.setStatus(UploadTaskStatus.COMPLETED);
                 uploadTask.setUpdatedAt(LocalDateTime.now());
                 updateById(uploadTask);
@@ -190,6 +203,7 @@ public class VideoUploadTaskServiceImpl extends ServiceImpl<VideoUploadTaskMappe
         LocalDateTime now = LocalDateTime.now();
 
         VideoInfo videoInfo = new VideoInfo();
+        videoInfo.setUserId(uploadTask.getUserId());
         videoInfo.setTitle(uploadTask.getTitle());
         videoInfo.setSourceUrl(sourceUrl);
         videoInfo.setFileMd5(md5);
@@ -198,7 +212,7 @@ public class VideoUploadTaskServiceImpl extends ServiceImpl<VideoUploadTaskMappe
         videoInfo.setUpdatedAt(now);
 
         videoInfoMapper.insert(videoInfo);
-        videoCacheService.evictAllLists();
+        videoCacheService.evictUserLists(uploadTask.getUserId());
         return videoInfo;
     }
 

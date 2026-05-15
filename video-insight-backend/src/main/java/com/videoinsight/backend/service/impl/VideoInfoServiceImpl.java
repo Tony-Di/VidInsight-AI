@@ -7,6 +7,7 @@ import com.videoinsight.backend.enums.VideoStatus;
 import com.videoinsight.backend.exception.BusinessException;
 import com.videoinsight.backend.mapper.VideoInfoMapper;
 import com.videoinsight.backend.model.request.VideoCreateRequest;
+import com.videoinsight.backend.security.SecurityUtil;
 import com.videoinsight.backend.service.FileStorageService;
 import com.videoinsight.backend.service.VideoAnalysisTaskService;
 import com.videoinsight.backend.service.VideoCacheService;
@@ -35,9 +36,11 @@ public class VideoInfoServiceImpl extends ServiceImpl<VideoInfoMapper, VideoInfo
 
     @Override
     public VideoInfo createVideo(VideoCreateRequest request) {
+        Long userId = SecurityUtil.currentUserId();
         LocalDateTime now = LocalDateTime.now();
 
         VideoInfo videoInfo = new VideoInfo();
+        videoInfo.setUserId(userId);
         videoInfo.setTitle(request.getTitle());
         videoInfo.setVideoStatus(VideoStatus.PENDING);
         videoInfo.setSourceUrl(request.getSourceUrl());
@@ -45,26 +48,30 @@ public class VideoInfoServiceImpl extends ServiceImpl<VideoInfoMapper, VideoInfo
         videoInfo.setUpdatedAt(now);
 
         save(videoInfo);
+        videoCacheService.evictUserLists(userId);
         return videoInfo;
     }
 
     @Override
     public VideoInfo uploadVideo(MultipartFile file, String title) {
+        Long userId = SecurityUtil.currentUserId();
         String sourceUrl = fileStorageService.saveVideo(file);
         String videoTitle = StringUtils.hasText(title) ? title : file.getOriginalFilename();
 
-        // MD5 去重
+        // MD5 去重(仅当前用户范围内,避免跨用户泄漏私有 transcript/summary)
         String md5 = computeMd5OrNull(fileStorageService.resolveLocalPath(sourceUrl));
         if (md5 != null) {
-            VideoInfo existing = getBaseMapper().findCompletedByMd5(md5);
+            VideoInfo existing = getBaseMapper().findCompletedByMd5AndUser(md5, userId);
             if (existing != null) {
-                log.info("Duplicate video detected (md5={}), reusing result from videoId={}", md5, existing.getId());
+                log.info("Duplicate video detected (md5={}, userId={}), reusing result from videoId={}",
+                        md5, userId, existing.getId());
                 return existing;
             }
         }
 
         LocalDateTime now = LocalDateTime.now();
         VideoInfo videoInfo = new VideoInfo();
+        videoInfo.setUserId(userId);
         videoInfo.setTitle(videoTitle);
         videoInfo.setVideoStatus(VideoStatus.PENDING);
         videoInfo.setSourceUrl(sourceUrl);
@@ -73,7 +80,7 @@ public class VideoInfoServiceImpl extends ServiceImpl<VideoInfoMapper, VideoInfo
         videoInfo.setUpdatedAt(now);
 
         save(videoInfo);
-        videoCacheService.evictAllLists();
+        videoCacheService.evictUserLists(userId);
         return videoInfo;
     }
 
@@ -88,36 +95,52 @@ public class VideoInfoServiceImpl extends ServiceImpl<VideoInfoMapper, VideoInfo
 
     @Override
     public PageResult<VideoInfo> listVideos(int page, int pageSize) {
+        Long userId = SecurityUtil.currentUserId();
         int safePage = Math.max(1, page);
         int safePageSize = Math.min(100, Math.max(1, pageSize));
 
-        PageResult<VideoInfo> cached = videoCacheService.getList(safePage, safePageSize);
+        PageResult<VideoInfo> cached = videoCacheService.getList(userId, safePage, safePageSize);
         if (cached != null) {
             return cached;
         }
 
-        long total = lambdaQuery().count();
+        long total = lambdaQuery().eq(VideoInfo::getUserId, userId).count();
         List<VideoInfo> records = lambdaQuery()
+                .eq(VideoInfo::getUserId, userId)
                 .orderByDesc(VideoInfo::getCreatedAt)
                 .last("LIMIT " + safePageSize + " OFFSET " + (long) (safePage - 1) * safePageSize)
                 .list();
         PageResult<VideoInfo> result = new PageResult<>(total, safePage, safePageSize, records);
-        videoCacheService.setList(safePage, safePageSize, result);
+        videoCacheService.setList(userId, safePage, safePageSize, result);
         return result;
     }
 
     @Override
     public VideoInfo getVideoDetail(Long id) {
+        Long userId = SecurityUtil.currentUserId();
         // Cache Aside + 防穿透(空值哨兵)+ 防击穿(回源互斥锁)+ 防雪崩(TTL 抖动)
-        // 这一行背后融合了 #7 的全部四种防御
-        return videoCacheService.getDetailOrLoad(id, () -> getById(id));
+        // 缓存不按用户分(同一个视频内容对所有人一样),所有权检查在外层做。
+        VideoInfo videoInfo = videoCacheService.getDetailOrLoad(id, () -> getById(id));
+        if (videoInfo == null) {
+            throw new BusinessException(404, "video does not exist");
+        }
+        if (!userId.equals(videoInfo.getUserId())) {
+            // 注意不要返回 404 vs 403 不同的状态——会泄漏"该 id 存在但不属于你"。
+            // 但这里项目还是返回 403 方便调试,生产可考虑统一返 404。
+            throw new BusinessException(403, "you do not own this video");
+        }
+        return videoInfo;
     }
 
     @Override
     public void deleteVideo(Long id) {
+        Long userId = SecurityUtil.currentUserId();
         VideoInfo videoInfo = getById(id);
         if (videoInfo == null) {
             throw new BusinessException(404, "video does not exist");
+        }
+        if (!userId.equals(videoInfo.getUserId())) {
+            throw new BusinessException(403, "you do not own this video");
         }
 
         String sourceUrl = videoInfo.getSourceUrl();
@@ -125,7 +148,7 @@ public class VideoInfoServiceImpl extends ServiceImpl<VideoInfoMapper, VideoInfo
 
         removeById(id);
         videoCacheService.evictDetail(id);
-        videoCacheService.evictAllLists();
+        videoCacheService.evictUserLists(userId);
 
         // 仅当没有其他记录引用同一物理文件时才删除（MD5 去重可能导致多条记录共用文件）
         if (StringUtils.hasText(sourceUrl)) {
@@ -152,9 +175,13 @@ public class VideoInfoServiceImpl extends ServiceImpl<VideoInfoMapper, VideoInfo
 
     @Override
     public VideoInfo analyzeVideo(Long id) {
+        Long userId = SecurityUtil.currentUserId();
         VideoInfo videoInfo = getById(id);
         if (videoInfo == null) {
             throw new BusinessException(404, "video does not exist");
+        }
+        if (!userId.equals(videoInfo.getUserId())) {
+            throw new BusinessException(403, "you do not own this video");
         }
 
         if (videoInfo.getVideoStatus() != VideoStatus.PENDING && videoInfo.getVideoStatus() != VideoStatus.FAILED) {
@@ -165,7 +192,7 @@ public class VideoInfoServiceImpl extends ServiceImpl<VideoInfoMapper, VideoInfo
         videoInfo.setUpdatedAt(LocalDateTime.now());
         updateById(videoInfo);
         videoCacheService.evictDetail(videoInfo.getId());
-        videoCacheService.evictAllLists();
+        videoCacheService.evictUserLists(userId);
 
         videoAnalysisTaskService.submitAnalysis(videoInfo.getId());
 

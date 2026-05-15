@@ -68,7 +68,7 @@ public class VideoImportTaskServiceImpl implements VideoImportTaskService {
             videoInfo.setUpdatedAt(LocalDateTime.now());
             videoInfoMapper.updateById(videoInfo);
             videoCacheService.evictDetail(videoInfo.getId());
-            videoCacheService.evictAllLists();
+            videoCacheService.evictUserLists(videoInfo.getUserId());
         } catch (Exception exception) {
             log.error("Video import failed, videoId={}", videoId, exception);
             videoInfo.setVideoStatus(VideoStatus.IMPORT_FAILED);
@@ -76,7 +76,7 @@ public class VideoImportTaskServiceImpl implements VideoImportTaskService {
             videoInfo.setUpdatedAt(LocalDateTime.now());
             videoInfoMapper.updateById(videoInfo);
             videoCacheService.evictDetail(videoInfo.getId());
-            videoCacheService.evictAllLists();
+            videoCacheService.evictUserLists(videoInfo.getUserId());
         } finally {
             deleteTempFile(downloadedFile);
         }
@@ -95,7 +95,8 @@ public class VideoImportTaskServiceImpl implements VideoImportTaskService {
                 log.warn("MD5 dedup lock busy for md5={}, skipping reuse check and proceeding to PENDING", md5);
                 return false;
             }
-            VideoInfo existing = videoInfoMapper.findCompletedByMd5(md5);
+            // MD5 复用按用户限定:不复用别人的已分析结果(隐私 + 所有权)。
+            VideoInfo existing = videoInfoMapper.findCompletedByMd5AndUser(md5, videoInfo.getUserId());
             if (existing == null) {
                 return false;
             }
@@ -110,7 +111,7 @@ public class VideoImportTaskServiceImpl implements VideoImportTaskService {
             videoInfo.setUpdatedAt(LocalDateTime.now());
             videoInfoMapper.updateById(videoInfo);
             videoCacheService.evictDetail(videoInfo.getId());
-            videoCacheService.evictAllLists();
+            videoCacheService.evictUserLists(videoInfo.getUserId());
             return true;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

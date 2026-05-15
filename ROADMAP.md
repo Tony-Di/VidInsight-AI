@@ -16,9 +16,9 @@
 | 1 | ~~删除视频~~ | ~~DELETE 接口，同时清理本地视频/音频文件，前端列表加删除按钮~~ | ~~Spring MVC、文件 IO~~ | **已完成** |
 | 2 | PROCESSING 卡死恢复 | `StartupRecoveryRunner` 扩展，启动时把 PROCESSING 重置为 FAILED（或重新入队） | Spring ApplicationRunner | 1 小时 |
 | 3 | ~~URL 导入 MD5 去重~~ | ~~下载完成后计算 MD5，命中已完成记录则复用，避免重复跑 ASR + AI~~ | ~~MyBatis-Plus~~ | **已完成** |
-| 4 | IMPORT_FAILED 重试 | 前端给 IMPORT_FAILED 状态加"重新导入"按钮，后端复用原 sourceUrl 重新提交 | 前端 + Spring MVC | 半天 |
-| 5 | 视频在线播放 | 前端 Modal 加 `<video>` 播放器，直接放 `/uploads/videos/*.mp4` | React + HTML5 video | 半天 |
-| 6 | 分页参数边界校验 | clamp page≥1、1≤pageSize≤100，防止 pageSize=99999999 压垮 DB | Spring Validation | 半小时 |
+| 4 | ~~IMPORT_FAILED 重试~~ | ~~前端给 IMPORT_FAILED 状态加"重新导入"按钮，后端复用原 sourceUrl 重新提交~~ | ~~前端 + Spring MVC~~ | **已完成** |
+| 5 | ~~视频在线播放~~ | ~~前端 Modal 加 `<video>` 播放器，直接放 `/uploads/videos/*.mp4`~~ | ~~React + HTML5 video~~ | **已完成** |
+| 6 | ~~分页参数边界校验~~ | ~~clamp page≥1、1≤pageSize≤100，防止 pageSize=99999999 压垮 DB~~ | ~~Spring Validation~~ | **已完成** |
 | 7 | 定时清理失败/孤儿记录 | `@Scheduled` 任务每天清理 IMPORT_FAILED/FAILED 旧记录、孤儿文件、卡死中间状态 | Spring Scheduling、Cron | 1-2 小时 |
 
 ---
@@ -27,11 +27,11 @@
 
 | # | 功能 | 描述 | 涉及技术 | 工作量 | 简历价值 |
 |---|------|------|---------|-------|---------|
-| 7 | Redis 缓存层 | 视频详情 / 分页列表加缓存，Cache Aside 模式，解决缓存穿透（布隆过滤器或空值缓存）、击穿（互斥锁）、雪崩（随机过期时间） | Spring Data Redis、Lettuce | 1-2 天 | ★★★★★ |
-| 8 | Redis 分布式锁 | MD5 去重场景加分布式锁，防止两个相同视频同时上传各自走完整流水线；Redisson 实现 | Redisson、SETNX | 半天 | ★★★★★ |
+| 7 | ~~Redis 缓存层~~ | ~~Cache Aside 读写流程 / 防穿透（空值哨兵 + 短 TTL）/ 防雪崩（TTL 随机抖动）/ 防击穿（互斥锁，与 #8 合并实现）~~ | ~~Spring Data Redis、Lettuce、ThreadLocalRandom~~ | **已完成** | ★★★★★ |
+| 8 | ~~Redis 分布式锁~~ | ~~MD5 去重场景加分布式锁，防止两个相同视频同时上传各自走完整流水线；同时承接 #7 的缓存击穿（热点 key 回源互斥）；Redisson RLock 实现（WatchDog 自动续期 + 双重检查 + 超时降级）~~ | ~~Redisson RLock~~ | **已完成** | ★★★★★ |
 | 9 | Redis 限流 | 接口限流（如导入接口限制每用户每分钟 5 次），Lua 脚本实现令牌桶 | Redis Lua | 半天 | ★★★★ |
 | 10 | Redis 进度存储 | 替代之前讨论的"内存 Map"，把 yt-dlp 下载进度 / 分析进度存 Redis，前端轮询读取 | Redis Hash | 半天 | ★★★ |
-| 11 | 用户体系 + JWT | 注册/登录/BCrypt 密码加密、JWT Token、视频归属到用户、列表只返回本人视频 | Spring Security 或 Sa-Token、JWT、BCrypt | 2 天 | ★★★★★ |
+| 11 | ~~用户体系 + JWT~~ | ~~Spring Security 6 无状态 filter chain / JWT(jjwt 0.12) HS256 24h / BCrypt 密码哈希 / 视频按 user_id 隔离 / MD5 去重按用户限定避免跨用户数据泄漏~~ | ~~Spring Security 6、jjwt 0.12、BCrypt~~ | **已完成（后端）** | ★★★★★ |
 | 12 | MinIO 对象存储 | 把本地文件存储替换为 MinIO，前端直接通过预签名 URL 上传到 MinIO 绕过后端 | MinIO SDK、预签名 URL | 2 天 | ★★★★ |
 | 13 | WebSocket 实时推送 | 替代前端 2.4s 轮询，分析状态变化时主动推送给前端 | Spring WebSocket / STOMP | 1 天 | ★★★★ |
 | 14 | AI 总结流式输出 | SiliconFlow chat 接口改为 stream=true，后端用 SSE 推给前端，实现"打字机效果" | SSE、Reactive | 1 天 | ★★★★ |
