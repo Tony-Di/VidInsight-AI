@@ -1376,3 +1376,562 @@ body:hover .cursor-glow,
   .vi-hero-title { font-size: 36px; }
   .vi-wb-h1 { font-size: 22px; }
 }
+
+/* ──────────────────────────────────────────────────────────── */
+/*  AUTH PAGE — sign in / sign up                                */
+/*  Visual: aurora blobs + film grain + floating mono fragments  */
+/*  on the left brand panel; 3D-tilt + magnetic-button card on   */
+/*  the right form panel. All selectors are `vi-auth-` prefixed  */
+/*  so they don't bleed into the rest of the app.                */
+/* ──────────────────────────────────────────────────────────── */
+
+.vi-auth-stage {
+  flex: 1 1 auto;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ─── Aurora (blobs + film grain) ─── */
+.vi-auth-aurora {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: radial-gradient(at 50% 0%, oklch(0.20 0.03 70 / 0.4), transparent 60%);
+}
+.vi-auth-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.55;
+  will-change: transform;
+}
+.vi-auth-blob.a {
+  width: 520px; height: 520px;
+  left: -120px; top: -120px;
+  background: radial-gradient(circle, oklch(0.62 0.16 60), transparent 60%);
+  animation: vi-auth-blob-a 22s ease-in-out infinite;
+}
+.vi-auth-blob.b {
+  width: 480px; height: 480px;
+  left: 30%; top: 50%;
+  background: radial-gradient(circle, oklch(0.45 0.12 50), transparent 60%);
+  animation: vi-auth-blob-b 28s ease-in-out infinite;
+}
+.vi-auth-blob.c {
+  width: 600px; height: 600px;
+  left: -200px; bottom: -200px;
+  background: radial-gradient(circle, oklch(0.50 0.10 40), transparent 60%);
+  animation: vi-auth-blob-c 32s ease-in-out infinite;
+}
+.vi-auth-blob.d {
+  width: 360px; height: 360px;
+  right: -60px; top: 30%;
+  background: radial-gradient(circle, oklch(0.40 0.08 280 / 0.7), transparent 60%);
+  animation: vi-auth-blob-d 26s ease-in-out infinite;
+  opacity: 0.35;
+}
+@keyframes vi-auth-blob-a {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(80px, 60px, 0) scale(1.1); }
+}
+@keyframes vi-auth-blob-b {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(-100px, 40px, 0) scale(0.9); }
+}
+@keyframes vi-auth-blob-c {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(120px, -80px, 0) scale(1.15); }
+}
+@keyframes vi-auth-blob-d {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(-50px, -60px, 0) scale(1.1); }
+}
+.vi-auth-grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    0deg,
+    rgba(255, 255, 255, 0.012) 0 1px,
+    transparent 1px 3px
+  );
+  mix-blend-mode: overlay;
+}
+
+/* ─── Floating particles (mono fragments) ─── */
+.vi-auth-particles {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.vi-auth-particle {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: oklch(0.78 0.13 70 / 0.32);
+  white-space: nowrap;
+  text-shadow: 0 0 8px oklch(0.78 0.13 70 / 0.25);
+  animation: vi-auth-drift linear infinite;
+}
+@keyframes vi-auth-drift {
+  0%   { transform: translate3d(0, 110vh, 0); opacity: 0; }
+  8%   { opacity: 1; }
+  92%  { opacity: 1; }
+  100% { transform: translate3d(var(--drift-x, 40px), -10vh, 0); opacity: 0; }
+}
+
+/* ─── Brand panel (left) ─── */
+.vi-auth-brand {
+  position: relative;
+  overflow: hidden;
+  border-right: 1px solid var(--line);
+  isolation: isolate;
+}
+.vi-auth-brand-content {
+  position: relative;
+  z-index: 2;
+  padding: 56px 56px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  height: 100%;
+}
+
+/* ─── Scramble row ─── */
+.vi-auth-scramble {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.vi-auth-scramble-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.vi-auth-scramble-word {
+  font-family: var(--font-mono);
+  color: var(--accent);
+  letter-spacing: 0.04em;
+  min-width: 130px;
+  display: inline-block;
+}
+
+/* ─── Stats row ─── */
+.vi-auth-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(20, 20, 22, 0.6);
+  backdrop-filter: blur(8px);
+}
+.vi-auth-stat {
+  padding: 12px 14px;
+  border-left: 1px solid var(--line);
+}
+.vi-auth-stat:first-child { border-left: 0; }
+.vi-auth-stat-big {
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+.vi-auth-stat-sm {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-3);
+  margin-top: 3px;
+}
+
+/* ─── Marquee ─── */
+.vi-auth-marquee {
+  position: relative;
+  overflow: hidden;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(2px);
+}
+.vi-auth-marquee-track {
+  display: flex;
+  gap: 36px;
+  padding: 12px 0;
+  animation: vi-auth-marquee 26s linear infinite;
+  width: max-content;
+}
+@keyframes vi-auth-marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.vi-auth-marquee-item {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-3);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.vi-auth-marquee-item::before {
+  content: '';
+  width: 3px;
+  height: 3px;
+  border-radius: 99px;
+  background: var(--accent);
+  opacity: 0.5;
+}
+.vi-auth-marquee-mask {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 80px;
+  pointer-events: none;
+  z-index: 2;
+}
+.vi-auth-marquee-mask.l {
+  left: 0;
+  background: linear-gradient(90deg, var(--bg), transparent);
+}
+.vi-auth-marquee-mask.r {
+  right: 0;
+  background: linear-gradient(-90deg, var(--bg), transparent);
+}
+
+/* ─── Form panel (right) ─── */
+.vi-auth-form-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 56px;
+  position: relative;
+}
+.vi-auth-form-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    800px 400px at 80% 50%,
+    oklch(0.78 0.13 70 / 0.06),
+    transparent 60%
+  );
+  pointer-events: none;
+}
+
+/* ─── Tilt wrap + card ─── */
+.vi-auth-tilt-wrap {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  perspective: 1200px;
+}
+.vi-auth-tilt {
+  transform-style: preserve-3d;
+  transform: rotateX(var(--ry, 0deg)) rotateY(var(--rx, 0deg));
+  transition: transform 220ms cubic-bezier(0.2, 0.6, 0.2, 1);
+  will-change: transform;
+}
+.vi-auth-card {
+  width: 100%;
+  max-width: 380px;
+  padding: 28px;
+  background: color-mix(in oklab, var(--surface) 92%, transparent);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--line-2);
+  border-radius: 14px;
+  position: relative;
+  box-shadow:
+    0 24px 60px -24px rgba(0, 0, 0, 0.7),
+    0 1px 0 rgba(255, 255, 255, 0.04) inset;
+}
+/* Lift the glow-host overlays to the card's 14 px corners so the
+   amber edge highlight follows the rounded outline cleanly. */
+.vi-auth-card.glow-host > .glow-border,
+.vi-auth-card.glow-host > .glow-spot {
+  border-radius: 14px;
+}
+
+/* ─── Field (with focus scan) ─── */
+.vi-auth-field-stack > * + * { margin-top: 10px; }
+.vi-auth-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  height: 44px;
+  background: var(--bg-2);
+  border: 1px solid var(--line-2);
+  border-radius: 7px;
+  overflow: hidden;
+  transition: border-color 180ms;
+  cursor: text;
+}
+.vi-auth-field:focus-within { border-color: oklch(0.78 0.13 70 / 0.6); }
+.vi-auth-field::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 1px;
+  width: 0;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  transition: width 0s;
+}
+.vi-auth-field:focus-within::after {
+  width: 100%;
+  animation: vi-auth-scan 1.6s ease-in-out infinite;
+}
+@keyframes vi-auth-scan {
+  0%   { transform: translateX(-100%); width: 50%; opacity: 0.5; }
+  50%  { opacity: 1; }
+  100% { transform: translateX(200%); width: 50%; opacity: 0.5; }
+}
+.vi-auth-field input {
+  flex: 1;
+  height: 100%;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  font-size: 13.5px;
+  color: var(--text);
+  letter-spacing: -0.005em;
+  min-width: 0;
+}
+.vi-auth-field input::placeholder {
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  letter-spacing: 0;
+}
+.vi-auth-field-icon {
+  color: var(--text-3);
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.vi-auth-field-action {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-3);
+  background: none;
+  border: 0;
+  padding: 0 4px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: color 140ms;
+  flex-shrink: 0;
+}
+.vi-auth-field-action:hover { color: var(--text-2); }
+
+/* ─── Buttons ─── */
+.vi-auth-btn {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  height: 44px;
+  border: 0;
+  border-radius: 7px;
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+}
+.vi-auth-btn[disabled] { cursor: not-allowed; opacity: 0.85; }
+.vi-auth-btn-primary {
+  color: var(--accent-ink);
+  background: linear-gradient(160deg, oklch(0.82 0.13 70), oklch(0.62 0.13 50));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 1px 0 rgba(0, 0, 0, 0.2),
+    0 8px 24px -8px oklch(0.78 0.13 70 / 0.6);
+  width: 100%;
+}
+.vi-auth-btn-primary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.55),
+    transparent
+  );
+  width: 40%;
+  transform: translateX(-120%) skewX(-18deg);
+  pointer-events: none;
+  animation: vi-auth-sheen 3.6s ease-in-out infinite;
+}
+@keyframes vi-auth-sheen {
+  0%, 65%   { transform: translateX(-120%) skewX(-18deg); }
+  85%, 100% { transform: translateX(260%) skewX(-18deg); }
+}
+
+/* ─── Spinner (re-uses vi-spin) ─── */
+.vi-auth-spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 99px;
+  border: 1.5px solid currentColor;
+  border-top-color: transparent;
+  animation: vi-spin 700ms linear infinite;
+  display: inline-block;
+}
+
+/* ─── Logo draw-in (left panel) ─── */
+.vi-auth-logo-fill {
+  animation: vi-auth-logo-fill 800ms ease-out 600ms both;
+}
+.vi-auth-logo-stroke {
+  stroke-dasharray: var(--len, 60);
+  stroke-dashoffset: var(--len, 60);
+  animation: vi-auth-logo-stroke 1200ms cubic-bezier(0.6, 0.05, 0.2, 0.95) 200ms both;
+}
+@keyframes vi-auth-logo-fill {
+  from { fill-opacity: 0; }
+  to   { fill-opacity: 1; }
+}
+@keyframes vi-auth-logo-stroke {
+  from { stroke-dashoffset: var(--len, 60); }
+  to   { stroke-dashoffset: 0; }
+}
+
+/* ─── Error banner ─── */
+.vi-auth-error {
+  color: var(--err);
+  font-size: 12.5px;
+  background: var(--err-soft);
+  border: 1px solid var(--err-border);
+  padding: 8px 10px;
+  border-radius: 6px;
+  margin-top: 4px;
+}
+
+/* ─── Legal + mode toggle ─── */
+.vi-auth-legal {
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-3);
+  line-height: 1.6;
+}
+.vi-auth-legal a {
+  color: var(--text-2);
+  text-decoration: underline;
+  text-decoration-color: var(--line-3);
+  text-underline-offset: 2px;
+}
+.vi-auth-legal a:hover { text-decoration-color: var(--accent); }
+
+.vi-auth-switch {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--line-2);
+  font-size: 12.5px;
+  color: var(--text-2);
+  text-align: center;
+}
+.vi-auth-switch-link {
+  color: var(--accent);
+  font-weight: 500;
+  background: none;
+  border: 0;
+  padding: 0;
+  font-size: inherit;
+  font-family: inherit;
+  cursor: pointer;
+}
+.vi-auth-switch-link:hover { text-decoration: underline; }
+
+/* ─── Language toggle (top-right, above both panels) ─── */
+.vi-auth-lang {
+  position: absolute;
+  top: 22px;
+  right: 28px;
+  z-index: 4;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-2);
+  background: color-mix(in oklab, var(--surface) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  padding: 6px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition:
+    background 140ms,
+    border-color 140ms,
+    transform 140ms cubic-bezier(0.2, 0.6, 0.2, 1);
+}
+.vi-auth-lang:hover {
+  background: var(--surface-2);
+  border-color: var(--line-3);
+  transform: translateY(-1px);
+}
+.vi-auth-lang .is-active { color: var(--text); }
+
+/* ─── Footer strip ─── */
+.vi-auth-footer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 14px 56px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-3);
+  z-index: 3;
+}
+
+/* ─── Responsive collapse ─── */
+@media (max-width: 880px) {
+  .vi-auth-stage { grid-template-columns: 1fr; min-height: 100dvh; }
+  .vi-auth-brand {
+    min-height: 280px;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .vi-auth-brand-content { padding: 28px; gap: 16px; }
+  .vi-auth-form-panel { padding: 36px 20px 68px; }
+  .vi-auth-footer {
+    padding: 10px 20px;
+    position: static;
+    border-top: 1px solid var(--line);
+  }
+}
+
+/* ─── Reduced motion ─── */
+@media (prefers-reduced-motion: reduce) {
+  .vi-auth-blob,
+  .vi-auth-particle,
+  .vi-auth-marquee-track,
+  .vi-auth-btn-primary::after,
+  .vi-auth-field:focus-within::after,
+  .vi-auth-logo-fill,
+  .vi-auth-logo-stroke {
+    animation: none !important;
+  }
+  .vi-auth-tilt {
+    transition: none !important;
+    transform: none !important;
+  }
+}

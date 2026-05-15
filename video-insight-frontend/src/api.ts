@@ -35,10 +35,67 @@ interface ChunkUploadResponse {
   totalChunks: number;
 }
 
+export interface UserProfile {
+  id: number;
+  email: string;
+  displayName: string;
+}
+
+export interface AuthResponse {
+  token: string;
+  expiresInSeconds: number;
+  user: UserProfile;
+}
+
 const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB per chunk
+const TOKEN_KEY = 'vi-token';
+const USER_KEY = 'vi-user';
+
+export function getStoredToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function getStoredUser(): UserProfile | null {
+  const raw = localStorage.getItem(USER_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as UserProfile;
+  } catch {
+    return null;
+  }
+}
+
+export function saveAuth(res: AuthResponse): void {
+  localStorage.setItem(TOKEN_KEY, res.token);
+  localStorage.setItem(USER_KEY, JSON.stringify(res.user));
+}
+
+export function clearAuth(): void {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+}
+
+/**
+ * 当 token 过期 / 失效时由 request() dispatch,App.tsx 监听后切回登录页。
+ * 用全局事件而不是 React state 因为 fetch 调用脱离了组件树,没法直接 setState。
+ */
+export const AUTH_REQUIRED_EVENT = 'vi-auth-required';
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, init);
+  const token = getStoredToken();
+  const headers = new Headers(init?.headers);
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+
+  const response = await fetch(url, { ...init, headers });
+
+  // HTTP 401 = Spring Security filter chain 拒绝 (token 过期 / 无效 / 缺失受保护接口)。
+  // 登录接口的"密码错"走的是 HTTP 200 + body code=401,不会进这里,所以这里清 token 是安全的。
+  if (response.status === 401) {
+    clearAuth();
+    window.dispatchEvent(new CustomEvent(AUTH_REQUIRED_EVENT));
+    throw new Error('session expired, please login again');
+  }
+
   const text = await response.text();
   const payload = text ? (JSON.parse(text) as ApiResponse<T>) : null;
 
@@ -47,6 +104,30 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   }
 
   return payload.data;
+}
+
+export async function loginApi(email: string, password: string): Promise<AuthResponse> {
+  return request<AuthResponse>('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export async function registerApi(
+  email: string,
+  password: string,
+  displayName?: string,
+): Promise<AuthResponse> {
+  return request<AuthResponse>('/api/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password, displayName }),
+  });
+}
+
+export async function getCurrentUserApi(): Promise<UserProfile> {
+  return request<UserProfile>('/api/auth/me');
 }
 
 async function initChunkUpload(

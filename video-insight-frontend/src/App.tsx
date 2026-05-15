@@ -10,15 +10,22 @@ import {
 } from 'react';
 import {
   analyzeVideo,
+  AUTH_REQUIRED_EVENT,
+  clearAuth,
   deleteVideo,
+  getCurrentUserApi,
+  getStoredToken,
+  getStoredUser,
   getVideo,
   importVideoByUrl,
   listVideos,
   retryImport,
   uploadVideoChunked,
+  type UserProfile,
   type VideoInfo,
   type VideoStatus,
 } from './api';
+import Auth from './Auth';
 
 const PAGE_SIZE = 10;
 
@@ -487,7 +494,12 @@ function ActionBtn({
   );
 }
 
-function App() {
+interface AppInnerProps {
+  user: UserProfile;
+  onLogout: () => void;
+}
+
+function AppInner({ user, onLogout }: AppInnerProps) {
   const { message } = AntdApp.useApp();
   const [page, setPage] = useState<Page>(() => getPageFromPath());
   const [file, setFile] = useState<File | null>(null);
@@ -891,10 +903,15 @@ function App() {
 
         <button
           className="vi-account-btn btn-lift"
-          title={t('account_label')}
-          aria-label={t('account_label')}
+          title={`${user.displayName || user.email} — click to log out`}
+          aria-label="Log out"
+          onClick={() => {
+            if (window.confirm(`Log out ${user.displayName || user.email}?`)) {
+              onLogout();
+            }
+          }}
         >
-          LM
+          {(user.displayName || user.email).slice(0, 2).toUpperCase()}
         </button>
       </div>
     </header>
@@ -1420,6 +1437,84 @@ function App() {
       )}
     </>
   );
+}
+
+type AuthState =
+  | { kind: 'checking' }
+  | { kind: 'unauthenticated' }
+  | { kind: 'authenticated'; user: UserProfile };
+
+/**
+ * Auth gate:启动时先验证 token 是否还有效再渲染主应用。
+ * - 没 token → 直接进登录
+ * - 有 token → 调 /me 验证;通过就进主应用,失败就清掉跳登录
+ * - 运行期间任何 API 返回 HTTP 401 → 通过全局事件回到登录页
+ */
+function App() {
+  const [authState, setAuthState] = useState<AuthState>(() =>
+    getStoredToken() ? { kind: 'checking' } : { kind: 'unauthenticated' },
+  );
+
+  useEffect(() => {
+    if (authState.kind !== 'checking') return;
+    // 先用 localStorage 里的 user 立刻渲染 UI(避免短暂白屏),后台再调 /me 校验。
+    const cached = getStoredUser();
+    let cancelled = false;
+    getCurrentUserApi()
+      .then((user) => {
+        if (!cancelled) setAuthState({ kind: 'authenticated', user });
+      })
+      .catch(() => {
+        if (!cancelled) {
+          clearAuth();
+          setAuthState({ kind: 'unauthenticated' });
+        }
+      });
+    // 如果之前 localStorage 有 user,立即用上(乐观渲染),后续 /me 失败再回退。
+    if (cached) {
+      setAuthState({ kind: 'authenticated', user: cached });
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [authState.kind]);
+
+  useEffect(() => {
+    const handler = () => setAuthState({ kind: 'unauthenticated' });
+    window.addEventListener(AUTH_REQUIRED_EVENT, handler);
+    return () => window.removeEventListener(AUTH_REQUIRED_EVENT, handler);
+  }, []);
+
+  const handleLogout = useCallback(() => {
+    clearAuth();
+    setAuthState({ kind: 'unauthenticated' });
+  }, []);
+
+  if (authState.kind === 'checking') {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#999',
+        }}
+      >
+        Loading…
+      </div>
+    );
+  }
+
+  if (authState.kind === 'unauthenticated') {
+    return (
+      <Auth
+        onAuthenticated={(user) => setAuthState({ kind: 'authenticated', user })}
+      />
+    );
+  }
+
+  return <AppInner user={authState.user} onLogout={handleLogout} />;
 }
 
 export default App;
