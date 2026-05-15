@@ -10,17 +10,27 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       theme={{
         algorithm: theme.darkAlgorithm,
         token: {
-          colorPrimary: '#00e1ff',
-          colorSuccess: '#4dffc4',
-          colorBgBase: '#050813',
-          colorTextBase: '#d8e4f7',
-          borderRadius: 6,
+          colorPrimary: '#e0a85e',
+          colorSuccess: '#7fc594',
+          colorWarning: '#e6b455',
+          colorError: '#d96b6b',
+          colorBgBase: '#0c0c0d',
+          colorTextBase: '#ededec',
+          borderRadius: 8,
           fontFamily:
-            'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+            "'Geist', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
         },
         components: {
-          Upload: {
-            colorBgContainer: 'transparent',
+          Modal: {
+            contentBg: '#141416',
+            headerBg: '#141416',
+            footerBg: '#141416',
+          },
+          Message: {
+            contentBg: '#141416',
+          },
+          Progress: {
+            defaultColor: '#e0a85e',
           },
         },
       }}
