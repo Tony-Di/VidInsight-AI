@@ -12,6 +12,7 @@ import com.videoinsight.backend.model.request.ChunkUploadInitRequest;
 import com.videoinsight.backend.model.response.ChunkUploadInitResponse;
 import com.videoinsight.backend.model.response.ChunkUploadResponse;
 import com.videoinsight.backend.service.FileStorageService;
+import com.videoinsight.backend.service.VideoCacheService;
 import com.videoinsight.backend.service.VideoUploadTaskService;
 import com.videoinsight.backend.util.FileHashUtil;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +41,8 @@ public class VideoUploadTaskServiceImpl extends ServiceImpl<VideoUploadTaskMappe
     private final FileStorageService fileStorageService;
 
     private final RedissonClient redissonClient;
+
+    private final VideoCacheService videoCacheService;
 
     @Override
     public ChunkUploadInitResponse initChunkUpload(ChunkUploadInitRequest request) {
@@ -195,6 +198,7 @@ public class VideoUploadTaskServiceImpl extends ServiceImpl<VideoUploadTaskMappe
         videoInfo.setUpdatedAt(now);
 
         videoInfoMapper.insert(videoInfo);
+        videoCacheService.evictAllLists();
         return videoInfo;
     }
 

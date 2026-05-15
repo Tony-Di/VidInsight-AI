@@ -74,7 +74,7 @@ const TRANSLATIONS = {
     status_importing: '导入中',
     status_import_failed: '导入失败',
     status_pending: '待处理',
-    status_processing: '处理中',
+    status_processing: '分析中',
     status_completed: '已就绪',
     status_failed: '失败',
     action_audio: '音频',
@@ -83,14 +83,24 @@ const TRANSLATIONS = {
     action_reanalyze: '重新分析',
     action_retry: '重试',
     action_delete: '删除',
+    action_cancel: '取消',
+    stage_queue: '已入队',
+    stage_probe: '探测媒体',
+    stage_decode: '解码音频',
+    stage_diarize: '分离说话人',
+    stage_transcribe: '转写文字',
+    stage_compose: '生成总结',
     msg_delete_confirm_title: '确认删除?',
     msg_delete_confirm_content: '此操作不可撤销,视频文件和分析结果都将被删除。',
+    msg_cancel_confirm_title: '确认取消分析?',
+    msg_cancel_confirm_content: '当前分析任务及其视频记录将被移除。',
     msg_delete_ok: '删除',
     msg_delete_cancel: '取消',
     msg_delete_success: '已删除',
     msg_delete_failed: '删除失败',
     msg_retry_submitted: '已重新提交导入',
     msg_retry_failed: '重新导入失败',
+    account_label: '账户',
     modal_tab_video: '视频',
     modal_video_unavailable: '视频暂不可用',
     modal_tab_transcript: '字幕',
@@ -146,7 +156,7 @@ const TRANSLATIONS = {
     status_importing: 'importing',
     status_import_failed: 'import failed',
     status_pending: 'pending',
-    status_processing: 'processing',
+    status_processing: 'analyzing',
     status_completed: 'ready',
     status_failed: 'failed',
     action_audio: 'Audio',
@@ -155,15 +165,26 @@ const TRANSLATIONS = {
     action_reanalyze: 'Re-analyze',
     action_retry: 'Retry',
     action_delete: 'Delete',
+    action_cancel: 'Cancel',
+    stage_queue: 'queued',
+    stage_probe: 'probing media',
+    stage_decode: 'decoding audio',
+    stage_diarize: 'diarizing',
+    stage_transcribe: 'transcribing',
+    stage_compose: 'composing',
     msg_delete_confirm_title: 'Delete this video?',
     msg_delete_confirm_content:
       'This cannot be undone. The video file and analysis results will be removed.',
+    msg_cancel_confirm_title: 'Cancel this analysis?',
+    msg_cancel_confirm_content:
+      'The running analysis task and its video record will be removed.',
     msg_delete_ok: 'Delete',
     msg_delete_cancel: 'Cancel',
     msg_delete_success: 'Deleted',
     msg_delete_failed: 'Delete failed',
     msg_retry_submitted: 'Retry submitted',
     msg_retry_failed: 'Retry failed',
+    account_label: 'Account',
     modal_tab_video: 'Video',
     modal_video_unavailable: 'Video not available',
     modal_tab_transcript: 'Transcript',
@@ -335,6 +356,15 @@ function IconEmpty({ size = 48, stroke = 1 }: IconProps) {
 const FILE_FORMATS = ['mp4', 'mov', 'avi', 'mkv', 'webm'];
 const LINK_SOURCES = ['bilibili', 'youtube', 'douyin', 'vimeo', 'm3u8'];
 
+const STAGES: { key: I18nKey; pct: number }[] = [
+  { key: 'stage_queue', pct: 4 },
+  { key: 'stage_probe', pct: 14 },
+  { key: 'stage_decode', pct: 32 },
+  { key: 'stage_diarize', pct: 52 },
+  { key: 'stage_transcribe', pct: 78 },
+  { key: 'stage_compose', pct: 94 },
+];
+
 /* ── Status → pill meta ─────────────────────────────────── */
 function getStatusMeta(
   status: VideoStatus,
@@ -368,9 +398,10 @@ function StatusPill({
   t: (k: I18nKey) => string;
 }) {
   const meta = getStatusMeta(status, t);
+  const isProcessing = status === 'PROCESSING';
   return (
     <span className={`vi-status-pill tone-${meta.tone}`}>
-      <span className="dot" />
+      {isProcessing ? <span className="vi-dot-pulse" /> : <span className="dot" />}
       {meta.label}
     </span>
   );
@@ -447,6 +478,7 @@ function App() {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshSpin, setRefreshSpin] = useState(false);
   const [lang, setLang] = useState<Lang>(getInitialLang);
+  const [stageIdx, setStageIdx] = useState(0);
 
   const pollTimerRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -523,6 +555,20 @@ function App() {
     if (page === 'workbench') void loadVideos(1);
   }, [loadVideos, page]);
 
+  /* Cycle stage label/pct for all PROCESSING cards (purely cosmetic
+     — backend does not expose per-stage progress). */
+  const hasProcessing = useMemo(
+    () => videos.some((v) => v.videoStatus === 'PROCESSING'),
+    [videos],
+  );
+  useEffect(() => {
+    if (!hasProcessing) return;
+    const id = window.setInterval(() => {
+      setStageIdx((i) => (i + 1) % STAGES.length);
+    }, 1300);
+    return () => window.clearInterval(id);
+  }, [hasProcessing]);
+
   useEffect(() => {
     if (pollTimerRef.current) {
       window.clearInterval(pollTimerRef.current);
@@ -582,6 +628,25 @@ function App() {
       title: t('msg_delete_confirm_title'),
       content: t('msg_delete_confirm_content'),
       okText: t('msg_delete_ok'),
+      cancelText: t('msg_delete_cancel'),
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await deleteVideo(video.id);
+          message.success(t('msg_delete_success'));
+          await loadVideos(currentPage, true);
+        } catch (error) {
+          message.error(error instanceof Error ? error.message : t('msg_delete_failed'));
+        }
+      },
+    });
+  };
+
+  const handleCancel = (video: VideoInfo) => {
+    Modal.confirm({
+      title: t('msg_cancel_confirm_title'),
+      content: t('msg_cancel_confirm_content'),
+      okText: t('action_cancel'),
       cancelText: t('msg_delete_cancel'),
       okButtonProps: { danger: true },
       onOk: async () => {
@@ -735,6 +800,14 @@ function App() {
             </span>
           </button>
         )}
+
+        <button
+          className="vi-account-btn btn-lift"
+          title={t('account_label')}
+          aria-label={t('account_label')}
+        >
+          LM
+        </button>
       </div>
     </header>
   );
@@ -1032,6 +1105,7 @@ function App() {
               const hasTranscript = !!video.transcript;
               const hasSummary = !!video.summary;
               const isImportFailed = video.videoStatus === 'IMPORT_FAILED';
+              const isProcessing = video.videoStatus === 'PROCESSING';
               const canReanalyze =
                 video.videoStatus === 'PENDING' ||
                 video.videoStatus === 'FAILED' ||
@@ -1040,14 +1114,19 @@ function App() {
                 ? t('source_local')
                 : t('source_web');
               const staggerIdx = Math.min(idx + 2, 6);
+              const stage = STAGES[stageIdx];
 
               return (
                 <article
                   key={video.id}
-                  className={`vi-task-card anim-up stagger-${staggerIdx}`}
+                  className={`vi-task-card anim-up stagger-${staggerIdx} ${
+                    isProcessing ? 'is-processing' : ''
+                  }`}
                 >
                   <div className="vi-task-head">
-                    <div className="vi-task-thumb">
+                    <div
+                      className={`vi-task-thumb ${isProcessing ? 'thumb-processing' : ''}`}
+                    >
                       <IconPlay />
                     </div>
                     <div className="vi-task-info">
@@ -1059,49 +1138,78 @@ function App() {
                     <StatusPill status={video.videoStatus} t={t} />
                   </div>
 
+                  {isProcessing && (
+                    <>
+                      <div className="vi-progress-track" />
+                      <div className="vi-stage-strip">
+                        <span className="vi-stage-text">
+                          <span className="idx">
+                            {String(stageIdx + 1).padStart(2, '0')}/
+                            {STAGES.length}
+                          </span>
+                          &nbsp;&nbsp;{t(stage.key)}
+                          <span className="ellipsis">…</span>
+                        </span>
+                        <span className="vi-stage-pct">{stage.pct}%</span>
+                      </div>
+                    </>
+                  )}
+
                   <div className="vi-action-row">
-                    <ActionBtn
-                      icon={<IconAudio />}
-                      label={t('action_audio')}
-                      enabled={hasAudio}
-                      href={hasAudio ? video.audioUrl : undefined}
-                    />
-                    <ActionBtn
-                      icon={<IconDoc />}
-                      label={t('action_transcript')}
-                      enabled={hasTranscript}
-                      onClick={() => openDetail(video, 'transcript')}
-                    />
-                    <ActionBtn
-                      icon={<IconSpark />}
-                      label={t('action_summary')}
-                      enabled={hasSummary}
-                      tone="accent"
-                      onClick={() => openDetail(video, 'summary')}
-                    />
-                    {isImportFailed ? (
+                    {isProcessing ? (
                       <ActionBtn
-                        icon={<IconRefresh />}
-                        label={t('action_retry')}
+                        icon={<IconTrash />}
+                        label={t('action_cancel')}
                         enabled
-                        onClick={() => void handleRetryImport(video)}
+                        tone="err"
+                        onClick={() => handleCancel(video)}
                       />
                     ) : (
-                      <ActionBtn
-                        icon={<IconPlay />}
-                        label={t('action_reanalyze')}
-                        enabled={canReanalyze}
-                        tone="accent"
-                        onClick={() => void handleStartAnalysis(video)}
-                      />
+                      <>
+                        <ActionBtn
+                          icon={<IconAudio />}
+                          label={t('action_audio')}
+                          enabled={hasAudio}
+                          href={hasAudio ? video.audioUrl : undefined}
+                        />
+                        <ActionBtn
+                          icon={<IconDoc />}
+                          label={t('action_transcript')}
+                          enabled={hasTranscript}
+                          onClick={() => openDetail(video, 'transcript')}
+                        />
+                        <ActionBtn
+                          icon={<IconSpark />}
+                          label={t('action_summary')}
+                          enabled={hasSummary}
+                          tone="accent"
+                          onClick={() => openDetail(video, 'summary')}
+                        />
+                        {isImportFailed ? (
+                          <ActionBtn
+                            icon={<IconRefresh />}
+                            label={t('action_retry')}
+                            enabled
+                            onClick={() => void handleRetryImport(video)}
+                          />
+                        ) : (
+                          <ActionBtn
+                            icon={<IconPlay />}
+                            label={t('action_reanalyze')}
+                            enabled={canReanalyze}
+                            tone="accent"
+                            onClick={() => void handleStartAnalysis(video)}
+                          />
+                        )}
+                        <ActionBtn
+                          icon={<IconTrash />}
+                          label={t('action_delete')}
+                          enabled
+                          tone="err"
+                          onClick={() => handleDelete(video)}
+                        />
+                      </>
                     )}
-                    <ActionBtn
-                      icon={<IconTrash />}
-                      label={t('action_delete')}
-                      enabled
-                      tone="err"
-                      onClick={() => handleDelete(video)}
-                    />
                   </div>
                 </article>
               );

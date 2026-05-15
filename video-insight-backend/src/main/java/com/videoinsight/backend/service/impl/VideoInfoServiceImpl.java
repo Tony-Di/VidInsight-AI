@@ -73,6 +73,7 @@ public class VideoInfoServiceImpl extends ServiceImpl<VideoInfoMapper, VideoInfo
         videoInfo.setUpdatedAt(now);
 
         save(videoInfo);
+        videoCacheService.evictAllLists();
         return videoInfo;
     }
 
@@ -124,6 +125,7 @@ public class VideoInfoServiceImpl extends ServiceImpl<VideoInfoMapper, VideoInfo
 
         removeById(id);
         videoCacheService.evictDetail(id);
+        videoCacheService.evictAllLists();
 
         // 仅当没有其他记录引用同一物理文件时才删除（MD5 去重可能导致多条记录共用文件）
         if (StringUtils.hasText(sourceUrl)) {
@@ -163,6 +165,7 @@ public class VideoInfoServiceImpl extends ServiceImpl<VideoInfoMapper, VideoInfo
         videoInfo.setUpdatedAt(LocalDateTime.now());
         updateById(videoInfo);
         videoCacheService.evictDetail(videoInfo.getId());
+        videoCacheService.evictAllLists();
 
         videoAnalysisTaskService.submitAnalysis(videoInfo.getId());
 

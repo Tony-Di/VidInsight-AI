@@ -47,6 +47,7 @@ public class VideoAnalysisJobServiceImpl implements VideoAnalysisJobService {
             videoInfo.setUpdatedAt(LocalDateTime.now());
             videoInfoMapper.updateById(videoInfo);
             videoCacheService.evictDetail(videoId);
+            videoCacheService.evictAllLists();
         } catch (Exception exception) {
             log.error("Video analysis failed, videoId={}", videoId, exception);
             videoInfo.setVideoStatus(VideoStatus.FAILED);
@@ -54,6 +55,7 @@ public class VideoAnalysisJobServiceImpl implements VideoAnalysisJobService {
             videoInfo.setUpdatedAt(LocalDateTime.now());
             videoInfoMapper.updateById(videoInfo);
             videoCacheService.evictDetail(videoId);
+            videoCacheService.evictAllLists();
         }
     }
 

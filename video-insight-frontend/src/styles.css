@@ -164,6 +164,27 @@ body::after {
   from { transform: rotate(0); }
   to   { transform: rotate(360deg); }
 }
+@keyframes vi-shimmer {
+  0%   { transform: translateX(-120%); }
+  100% { transform: translateX(220%); }
+}
+@keyframes vi-progress {
+  0%   { left: -40%; width: 40%; }
+  50%  { left: 30%;  width: 50%; }
+  100% { left: 100%; width: 40%; }
+}
+@keyframes vi-bar-pulse {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1; }
+}
+@keyframes vi-dot-pulse {
+  0%, 100% { transform: scale(1);   opacity: 1;   }
+  50%      { transform: scale(1.6); opacity: 0.4; }
+}
+@keyframes vi-thumb-pulse {
+  0%, 100% { filter: brightness(1); }
+  50%      { filter: brightness(1.25); }
+}
 
 .anim-up      { animation: vi-fade-up 520ms cubic-bezier(0.2, 0.6, 0.2, 1) both; }
 .anim-in      { animation: vi-fade-in 700ms ease both; }
@@ -270,10 +291,12 @@ body::after {
 @media (prefers-reduced-motion: reduce) {
   .anim-up, .anim-in, .anim-pulse, .anim-blink, .anim-card-glow, .icon-bob,
   .dropzone, .btn-primary::after, body::before, body::after,
-  .word-rotate, .serif-accent::after, .spin.is-spinning svg {
+  .word-rotate, .serif-accent::after, .spin.is-spinning svg,
+  .thumb-processing, .thumb-processing::after, .vi-progress-track::before,
+  .vi-dot-pulse, .vi-stage-text {
     animation: none !important;
   }
-  .btn-lift { transition: none !important; }
+  .btn-lift, .vi-task-card { transition: none !important; }
 }
 
 /* ── Header ──────────────────────────────────────────────── */
@@ -365,6 +388,28 @@ body::after {
   background: var(--surface-2);
 }
 .vi-nav-btn .arrow-slide { color: var(--text-3); }
+
+.vi-account-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 99px;
+  border: 1px solid var(--line-2);
+  background: linear-gradient(135deg, #3a3530, #1d1b18);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-family: var(--font);
+  flex-shrink: 0;
+}
+.vi-account-btn:hover {
+  border-color: var(--line-3);
+  background: linear-gradient(135deg, #423d36, #221f1c);
+}
 
 /* ── Footer ──────────────────────────────────────────────── */
 .vi-footer {
@@ -772,6 +817,76 @@ body::after {
 .vi-task-card:hover {
   border-color: var(--line-2);
   transform: translateY(-1px);
+}
+.vi-task-card.is-processing {
+  border-color: oklch(0.82 0.14 85 / 0.35);
+}
+
+/* Processing-only decorations */
+.thumb-processing {
+  position: relative;
+  overflow: hidden;
+  animation: vi-thumb-pulse 1.6s ease-in-out infinite;
+}
+.thumb-processing::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, oklch(0.78 0.13 70 / 0.45), transparent);
+  animation: vi-shimmer 1.4s linear infinite;
+}
+
+.vi-progress-track {
+  position: relative;
+  height: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+.vi-progress-track::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--accent);
+  box-shadow: 0 0 8px oklch(0.78 0.13 70 / 0.6);
+  animation: vi-progress 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.vi-stage-strip {
+  padding: 8px 14px;
+  border-top: 1px solid var(--line);
+  background: var(--bg-2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.vi-stage-text {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+  animation: vi-bar-pulse 1.6s ease-in-out infinite;
+}
+.vi-stage-text .idx { color: var(--text-3); }
+.vi-stage-text .ellipsis { color: var(--text-3); }
+
+.vi-stage-pct {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.vi-dot-pulse {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 99px;
+  background: currentColor;
+  animation: vi-dot-pulse 1.2s ease-in-out infinite;
 }
 
 .vi-task-head {

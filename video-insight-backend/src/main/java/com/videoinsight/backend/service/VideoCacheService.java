@@ -36,4 +36,11 @@ public interface VideoCacheService {
     PageResult<VideoInfo> getList(int page, int pageSize);
 
     void setList(int page, int pageSize, PageResult<VideoInfo> result);
+
+    /**
+     * 删除所有分页列表缓存。任何会改变列表内容的写操作（新增/删除/状态变化）都要调用，
+     * 否则会出现"DB 已改 → 列表缓存仍是旧数据"的脏读，导致前端误操作（例如重复删除 404）。
+     * 实现使用 SCAN 而非 KEYS,避免在生产 Redis 上阻塞。
+     */
+    void evictAllLists();
 }

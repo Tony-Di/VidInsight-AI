@@ -7,10 +7,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
+import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -150,6 +154,28 @@ public class RedisVideoCacheServiceImpl implements VideoCacheService {
             redisTemplate.opsForValue().set(listKey(page, pageSize), result, jitter(LIST_TTL_BASE, LIST_TTL_JITTER_SECONDS));
         } catch (Exception e) {
             log.warn("Redis setList failed for page={} size={}: {}", page, pageSize, e.getMessage());
+        }
+    }
+
+    @Override
+    public void evictAllLists() {
+        try {
+            // 用 SCAN 而不是 KEYS:KEYS 在大数据集上会阻塞整个 Redis,SCAN 是游标式遍历不阻塞。
+            ScanOptions options = ScanOptions.scanOptions()
+                    .match(LIST_KEY_PREFIX + "*")
+                    .count(100)
+                    .build();
+            List<String> matched = new ArrayList<>();
+            try (Cursor<String> cursor = redisTemplate.scan(options)) {
+                while (cursor.hasNext()) {
+                    matched.add(cursor.next());
+                }
+            }
+            if (!matched.isEmpty()) {
+                redisTemplate.delete(matched);
+            }
+        } catch (Exception e) {
+            log.warn("Redis evictAllLists failed: {}", e.getMessage());
         }
     }
 

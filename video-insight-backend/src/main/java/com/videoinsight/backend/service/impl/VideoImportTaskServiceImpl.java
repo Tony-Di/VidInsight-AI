@@ -68,6 +68,7 @@ public class VideoImportTaskServiceImpl implements VideoImportTaskService {
             videoInfo.setUpdatedAt(LocalDateTime.now());
             videoInfoMapper.updateById(videoInfo);
             videoCacheService.evictDetail(videoInfo.getId());
+            videoCacheService.evictAllLists();
         } catch (Exception exception) {
             log.error("Video import failed, videoId={}", videoId, exception);
             videoInfo.setVideoStatus(VideoStatus.IMPORT_FAILED);
@@ -75,6 +76,7 @@ public class VideoImportTaskServiceImpl implements VideoImportTaskService {
             videoInfo.setUpdatedAt(LocalDateTime.now());
             videoInfoMapper.updateById(videoInfo);
             videoCacheService.evictDetail(videoInfo.getId());
+            videoCacheService.evictAllLists();
         } finally {
             deleteTempFile(downloadedFile);
         }
@@ -108,6 +110,7 @@ public class VideoImportTaskServiceImpl implements VideoImportTaskService {
             videoInfo.setUpdatedAt(LocalDateTime.now());
             videoInfoMapper.updateById(videoInfo);
             videoCacheService.evictDetail(videoInfo.getId());
+            videoCacheService.evictAllLists();
             return true;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

@@ -35,6 +35,7 @@ public class VideoImportServiceImpl extends ServiceImpl<VideoInfoMapper, VideoIn
         videoInfo.setUpdatedAt(now);
 
         save(videoInfo);
+        videoCacheService.evictAllLists();
         videoImportTaskService.submitImport(videoInfo.getId(), request.getSourceUrl());
         return videoInfo;
     }
@@ -60,6 +61,7 @@ public class VideoImportServiceImpl extends ServiceImpl<VideoInfoMapper, VideoIn
         videoInfo.setUpdatedAt(LocalDateTime.now());
         updateById(videoInfo);
         videoCacheService.evictDetail(videoInfo.getId());
+        videoCacheService.evictAllLists();
 
         videoImportTaskService.submitImport(videoInfo.getId(), originalUrl);
         return videoInfo;
