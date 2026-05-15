@@ -5,6 +5,7 @@ import com.videoinsight.backend.entity.VideoInfo;
 import com.videoinsight.backend.model.request.ChunkUploadInitRequest;
 import com.videoinsight.backend.model.response.ChunkUploadInitResponse;
 import com.videoinsight.backend.model.response.ChunkUploadResponse;
+import com.videoinsight.backend.ratelimit.RateLimit;
 import com.videoinsight.backend.service.VideoUploadTaskService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -30,6 +31,7 @@ public class VideoUploadController {
 
     @PostMapping("/init")
     @Operation(summary = "Initialize chunk upload", description = "Creates a chunk upload task and returns an uploadId.")
+    @RateLimit(key = "video.chunked.init", capacity = 10, refillPerMinute = 10)
     public ApiResponse<ChunkUploadInitResponse> initChunkUpload(@Valid @RequestBody ChunkUploadInitRequest request) {
         return ApiResponse.success(videoUploadTaskService.initChunkUpload(request));
     }

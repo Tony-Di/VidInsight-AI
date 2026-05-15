@@ -5,6 +5,7 @@ import com.videoinsight.backend.common.PageResult;
 import com.videoinsight.backend.entity.VideoInfo;
 import com.videoinsight.backend.model.request.VideoCreateRequest;
 import com.videoinsight.backend.model.request.VideoImportRequest;
+import com.videoinsight.backend.ratelimit.RateLimit;
 import com.videoinsight.backend.service.VideoInfoService;
 import com.videoinsight.backend.service.VideoImportService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -42,18 +43,21 @@ public class VideoInfoController {
 
     @PostMapping("/import-url")
     @Operation(summary = "Import video from URL", description = "Creates an IMPORTING record and downloads the URL to local storage in the background.")
+    @RateLimit(key = "video.import", capacity = 5, refillPerMinute = 5)
     public ApiResponse<VideoInfo> importVideo(@Valid @RequestBody VideoImportRequest request) {
         return ApiResponse.success(videoImportService.importVideo(request));
     }
 
     @PostMapping("/{id}/retry-import")
     @Operation(summary = "Retry failed import", description = "Re-submits an IMPORT_FAILED video using its original source URL.")
+    @RateLimit(key = "video.import", capacity = 5, refillPerMinute = 5)
     public ApiResponse<VideoInfo> retryImport(@Parameter(description = "Video id") @PathVariable Long id) {
         return ApiResponse.success(videoImportService.retryImport(id));
     }
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Upload local video", description = "Uploads a local video file and creates a video record.")
+    @RateLimit(key = "video.upload", capacity = 10, refillPerMinute = 10)
     public ApiResponse<VideoInfo> uploadVideo(@Parameter(description = "Local video file") @RequestPart("file") MultipartFile file,
                                               @Parameter(description = "Optional video title") @RequestParam(value = "title", required = false) String title) {
         return ApiResponse.success(videoInfoService.uploadVideo(file, title));
@@ -75,6 +79,7 @@ public class VideoInfoController {
 
     @PostMapping("/{id}/analyze")
     @Operation(summary = "Submit video analysis task", description = "Marks the video as PROCESSING and submits the analysis task to a background thread pool.")
+    @RateLimit(key = "video.analyze", capacity = 5, refillPerMinute = 5)
     public ApiResponse<VideoInfo> analyzeVideo(@Parameter(description = "Video id") @PathVariable Long id) {
         return ApiResponse.success(videoInfoService.analyzeVideo(id));
     }
