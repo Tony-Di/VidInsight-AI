@@ -168,6 +168,25 @@ body::after {
   0%   { transform: translateX(-120%); }
   100% { transform: translateX(220%); }
 }
+/* Long-loop breathing underline beneath the serif word */
+@keyframes vi-underline-loop {
+  0%    { transform: scaleX(0); transform-origin: left;  opacity: 1; }
+  18%   { transform: scaleX(1); transform-origin: left;  opacity: 1; }
+  18.1% { transform: scaleX(1); transform-origin: right; opacity: 1; }
+  36%   { transform: scaleX(0); transform-origin: right; opacity: 1; }
+  100%  { transform: scaleX(0); transform-origin: right; opacity: 0; }
+}
+/* Shimmer overlay on a freshly-rotated word */
+@keyframes vi-word-shimmer {
+  0%   { transform: translateX(-120%); opacity: 0; }
+  20%  { opacity: 1; }
+  100% { transform: translateX(220%); opacity: 0; }
+}
+/* Slow ambient logo breathing */
+@keyframes vi-logo-breath {
+  0%, 100% { filter: brightness(1)    saturate(1); }
+  50%      { filter: brightness(1.12) saturate(1.08); }
+}
 @keyframes vi-progress {
   0%   { left: -40%; width: 40%; }
   50%  { left: 30%;  width: 50%; }
@@ -271,6 +290,18 @@ body::after {
   color: var(--text);
   animation: vi-word-in 380ms ease both;
   font-weight: 500;
+  position: relative;
+  overflow: hidden;
+  padding: 0 1px;
+}
+.word-rotate::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, oklch(0.78 0.13 70 / 0.55), transparent);
+  width: 60%;
+  pointer-events: none;
+  animation: vi-word-shimmer 1100ms ease-out both;
 }
 
 .serif-accent { position: relative; }
@@ -285,16 +316,99 @@ body::after {
   background: linear-gradient(90deg, transparent, var(--accent), transparent);
   transform: scaleX(0);
   transform-origin: left;
-  animation: vi-underline 1100ms cubic-bezier(0.2, 0.6, 0.2, 1) 600ms both;
+  animation: vi-underline-loop 7.5s cubic-bezier(0.4, 0, 0.2, 1) 800ms infinite;
 }
+
+/* Subtle ambient breath on the brand mark */
+.vi-logo-mark svg { animation: vi-logo-breath 9s ease-in-out infinite; }
+
+/* Global cursor spotlight — driven by --mx/--my set on :root in JS */
+.cursor-glow {
+  position: fixed;
+  pointer-events: none;
+  z-index: 0;
+  left: 0;
+  top: 0;
+  width: 720px;
+  height: 720px;
+  margin-left: -360px;
+  margin-top: -360px;
+  transform: translate3d(var(--mx, 50vw), var(--my, 30vh), 0);
+  background: radial-gradient(
+    circle at center,
+    oklch(0.78 0.13 70 / 0.07),
+    transparent 62%
+  );
+  filter: blur(8px);
+  opacity: 0;
+  transition: opacity 800ms ease;
+  will-change: transform;
+}
+.cursor-glow.is-armed { opacity: 1; }
+
+/* Hero subtle parallax — uses normalized --px/--py from :root */
+.vi-hero {
+  transform: translate3d(
+    calc(var(--px, 0) * 6px),
+    calc(var(--py, 0) * 3px),
+    0
+  );
+  transition: transform 260ms cubic-bezier(0.2, 0.6, 0.2, 1);
+  will-change: transform;
+}
+
+/* Upload card — mouse-aware edge highlight + soft spot.
+   --cmx / --cmy are set in JS as pixel offsets relative to the card. */
+.glow-host { position: relative; }
+.glow-host > .glow-border,
+.glow-host > .glow-spot {
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 360ms ease;
+}
+.glow-host > .glow-border {
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  padding: 1px;
+  background: radial-gradient(
+    220px circle at var(--cmx, 50%) var(--cmy, 50%),
+    oklch(0.78 0.13 70 / 0.55),
+    transparent 70%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+.glow-host > .glow-spot {
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  background: radial-gradient(
+    360px circle at var(--cmx, 50%) var(--cmy, 50%),
+    oklch(0.78 0.13 70 / 0.06),
+    transparent 70%
+  );
+}
+.glow-host:hover > .glow-border,
+.glow-host:hover > .glow-spot { opacity: 1; }
 
 @media (prefers-reduced-motion: reduce) {
   .anim-up, .anim-in, .anim-pulse, .anim-blink, .anim-card-glow, .icon-bob,
   .dropzone, .btn-primary::after, body::before, body::after,
-  .word-rotate, .serif-accent::after, .spin.is-spinning svg,
+  .word-rotate, .word-rotate::after, .serif-accent::after,
+  .vi-logo-mark svg, .cursor-glow, .vi-hero,
+  .spin.is-spinning svg,
   .thumb-processing, .thumb-processing::after, .vi-progress-track::before,
   .vi-dot-pulse, .vi-stage-text {
     animation: none !important;
+    transition: none !important;
+    transform: none !important;
   }
   .btn-lift, .vi-task-card { transition: none !important; }
 }
@@ -335,17 +449,15 @@ body::after {
 .vi-logo-mark {
   width: 24px;
   height: 24px;
-  border-radius: 6px;
-  background: linear-gradient(160deg, oklch(0.82 0.13 70), oklch(0.60 0.13 50));
-  color: #1a1408;
-  font-size: 13px;
-  font-weight: 700;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.35),
-    0 1px 2px rgba(0, 0, 0, 0.4);
+  flex-shrink: 0;
+}
+.vi-logo-mark svg {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 .vi-logo-text {

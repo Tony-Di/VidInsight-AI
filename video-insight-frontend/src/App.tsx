@@ -232,6 +232,34 @@ function isLocalSource(sourceUrl: string | undefined): boolean {
   return sourceUrl.startsWith('/uploads/');
 }
 
+/* ── Brand logo mark (two-triangle V) ───────────────────────── */
+function LogoMark({ size = 24 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id="vi-logo-grad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="oklch(0.82 0.13 70)" />
+          <stop offset="100%" stopColor="oklch(0.60 0.13 50)" />
+        </linearGradient>
+      </defs>
+      <path d="M3 4 L12 20 L12 12 Z" fill="url(#vi-logo-grad)" />
+      <path
+        d="M21 4 L12 20 L12 12 Z"
+        fill="none"
+        stroke="oklch(0.78 0.13 70)"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 /* ── Inline icons (16px viewBox, currentColor stroke) ──────── */
 type IconProps = { size?: number; stroke?: number };
 
@@ -482,6 +510,8 @@ function App() {
 
   const pollTimerRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const cursorGlowRef = useRef<HTMLDivElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
 
   const t = useCallback((key: I18nKey) => TRANSLATIONS[lang][key], [lang]);
 
@@ -554,6 +584,62 @@ function App() {
   useEffect(() => {
     if (page === 'workbench') void loadVideos(1);
   }, [loadVideos, page]);
+
+  /* Global pointer tracker — drives the cursor spotlight and hero
+     parallax via CSS custom properties on :root. rAF-throttled. */
+  useEffect(() => {
+    let frame = 0;
+    let mx = 0;
+    let my = 0;
+    let px = 0;
+    let py = 0;
+    const onMove = (e: PointerEvent) => {
+      mx = e.clientX;
+      my = e.clientY;
+      px = (e.clientX / window.innerWidth - 0.5) * 2;
+      py = (e.clientY / window.innerHeight - 0.5) * 2;
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        const root = document.documentElement;
+        root.style.setProperty('--mx', `${mx}px`);
+        root.style.setProperty('--my', `${my}px`);
+        root.style.setProperty('--px', px.toFixed(3));
+        root.style.setProperty('--py', py.toFixed(3));
+        cursorGlowRef.current?.classList.add('is-armed');
+        frame = 0;
+      });
+    };
+    window.addEventListener('pointermove', onMove, { passive: true });
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  /* Per-panel pointer tracker — drives the upload card's --cmx / --cmy. */
+  useEffect(() => {
+    const el = panelRef.current;
+    if (!el) return;
+    let frame = 0;
+    let nx = 0;
+    let ny = 0;
+    const onMove = (e: PointerEvent) => {
+      const rect = el.getBoundingClientRect();
+      nx = e.clientX - rect.left;
+      ny = e.clientY - rect.top;
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        el.style.setProperty('--cmx', `${nx}px`);
+        el.style.setProperty('--cmy', `${ny}px`);
+        frame = 0;
+      });
+    };
+    el.addEventListener('pointermove', onMove);
+    return () => {
+      el.removeEventListener('pointermove', onMove);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [page]);
 
   /* Cycle stage label/pct for all PROCESSING cards (purely cosmetic
      — backend does not expose per-stage progress). */
@@ -763,7 +849,9 @@ function App() {
           onClick={() => navigateTo('home')}
           aria-label="VidInsight"
         >
-          <span className="vi-logo-mark logo-mark">v</span>
+          <span className="vi-logo-mark logo-mark">
+            <LogoMark />
+          </span>
           <span className="vi-logo-text">
             VidInsight <span className="dim">AI</span>
           </span>
@@ -834,6 +922,7 @@ function App() {
 
     return (
       <>
+        <div ref={cursorGlowRef} className="cursor-glow" aria-hidden="true" />
         {Header}
         <main className="vi-main">
           <section className="vi-hero">
@@ -864,7 +953,12 @@ function App() {
             <p className="vi-hero-sub anim-up stagger-2">{t('hero_sub')}</p>
           </section>
 
-          <div className="vi-panel anim-up stagger-3 anim-card-glow">
+          <div
+            ref={panelRef}
+            className="vi-panel anim-up stagger-3 anim-card-glow glow-host"
+          >
+            <div className="glow-spot" />
+            <div className="glow-border" />
             <div className="vi-panel-grid">
               {/* LOCAL FILE */}
               <div
