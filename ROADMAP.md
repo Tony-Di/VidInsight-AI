@@ -20,6 +20,7 @@
 | 5 | ~~视频在线播放~~ | ~~前端 Modal 加 `<video>` 播放器，直接放 `/uploads/videos/*.mp4`~~ | ~~React + HTML5 video~~ | **已完成** |
 | 6 | ~~分页参数边界校验~~ | ~~clamp page≥1、1≤pageSize≤100，防止 pageSize=99999999 压垮 DB~~ | ~~Spring Validation~~ | **已完成** |
 | 7 | 定时清理失败/孤儿记录 | `@Scheduled` 任务每天清理 IMPORT_FAILED/FAILED 旧记录、孤儿文件、卡死中间状态 | Spring Scheduling、Cron | 1-2 小时 |
+| 8 | ~~列表缓存写路径失效~~ | ~~Cache Aside 写策略闭环:delete/upload/import/analyze 完成后都 evict 列表缓存(SCAN+DEL,非 KEYS)。修复"删除后列表 60s 内仍显示已删视频"的脏读 bug~~ | ~~Redis SCAN、Spring Data Redis~~ | **已完成** |
 
 ---
 
@@ -31,8 +32,8 @@
 | 8 | ~~Redis 分布式锁~~ | ~~MD5 去重场景加分布式锁，防止两个相同视频同时上传各自走完整流水线；同时承接 #7 的缓存击穿（热点 key 回源互斥）；Redisson RLock 实现（WatchDog 自动续期 + 双重检查 + 超时降级）~~ | ~~Redisson RLock~~ | **已完成** | ★★★★★ |
 | 9 | Redis 限流 | 接口限流（如导入接口限制每用户每分钟 5 次），Lua 脚本实现令牌桶 | Redis Lua | 半天 | ★★★★ |
 | 10 | Redis 进度存储 | 替代之前讨论的"内存 Map"，把 yt-dlp 下载进度 / 分析进度存 Redis，前端轮询读取 | Redis Hash | 半天 | ★★★ |
-| 11 | ~~用户体系 + JWT~~ | ~~Spring Security 6 无状态 filter chain / JWT(jjwt 0.12) HS256 24h / BCrypt 密码哈希 / 视频按 user_id 隔离 / MD5 去重按用户限定避免跨用户数据泄漏~~ | ~~Spring Security 6、jjwt 0.12、BCrypt~~ | **已完成（后端）** | ★★★★★ |
-| 12 | MinIO 对象存储 | 把本地文件存储替换为 MinIO，前端直接通过预签名 URL 上传到 MinIO 绕过后端 | MinIO SDK、预签名 URL | 2 天 | ★★★★ |
+| 11 | ~~用户体系 + JWT~~ | ~~后端:Spring Security 6 无状态 filter chain / JWT(jjwt 0.12) HS256 24h / BCrypt 密码哈希 / 视频按 user_id 隔离 / MD5 去重按用户限定避免跨用户数据泄漏 / CORS preflight 走独立 CorsConfigurationSource。前端:Auth 页 + token 注入 + 401 全局事件 + 乐观渲染恢复登录态~~ | ~~Spring Security 6、jjwt 0.12、BCrypt、React~~ | **已完成（前后端）** | ★★★★★ |
+| 12 | AWS S3 对象存储 | 把本地 uploads 替换为 S3,前端用预签名 URL 直传(绕过后端流量)。S3 key 按用户分前缀(`s3://bucket/user-{id}/...`)。**取代之前的 MinIO 方案**——目标是真公网部署 | AWS SDK v2、预签名 URL | 2 天 | ★★★★★ |
 | 13 | WebSocket 实时推送 | 替代前端 2.4s 轮询，分析状态变化时主动推送给前端 | Spring WebSocket / STOMP | 1 天 | ★★★★ |
 | 14 | AI 总结流式输出 | SiliconFlow chat 接口改为 stream=true，后端用 SSE 推给前端，实现"打字机效果" | SSE、Reactive | 1 天 | ★★★★ |
 
@@ -42,7 +43,7 @@
 
 | # | 功能 | 描述 | 涉及技术 | 工作量 | 简历价值 |
 |---|------|------|---------|-------|---------|
-| 15 | Elasticsearch 搜索 | 对 transcript 和 summary 做全文搜索，高亮命中片段 | Elasticsearch、IK 分词器 | 2 天 | ★★★★ |
+| 15 | ~~Elasticsearch 搜索~~ | ~~对 transcript 和 summary 做全文搜索~~ ❌ **已 drop**:US recruiter 不关注全文搜索优化,数据规模也撑不起 ES 运维复杂度 | — | — | — |
 | 16 | Docker 化 | 后端多阶段 Dockerfile、前端 nginx 镜像、完整 docker-compose 一键启动 | Docker、Docker Compose | 半天 | ★★★ |
 | 17 | GitHub Actions CI | 自动跑 mvnw test、构建镜像、推送到 GHCR | GitHub Actions | 半天 | ★★★ |
 | 18 | Prometheus + Grafana | Actuator 暴露 metrics，Grafana 展示请求 QPS / P99 延迟 / JVM 内存 | Spring Actuator、Micrometer | 1 天 | ★★★ |
@@ -66,21 +67,40 @@
 
 ---
 
-## 建议的实施顺序
+## 当前进度（截至 2026-05-15）
 
-如果以 NG 找工为目标，按以下顺序做收益最大：
+✅ **已完成**:
+- P0 全部除了 #2(PROCESSING 卡死恢复)和 #7(定时清理)
+- P1 #7(Redis 缓存层)、#8(Redisson 分布式锁)、#11(JWT 前后端)、新增 #8(列表缓存写路径失效)
 
-1. **第 1 周** — P0 全部做完（功能闭环）
-2. **第 2-3 周** — Redis 三件套（#7、#8、#9）+ 用户体系（#11），简历直接多两个加分项
-3. **第 4 周** — MinIO（#12）+ WebSocket（#13）+ AI 流式（#14），体验直接上一个台阶
-4. **第 5 周** — Docker（#16）+ CI（#17）+ 部署上线（#28），让面试官能扫码访问
-5. **后续** — 根据剩余时间挑 P2
+⏳ **下一步建议顺序**(距实习结束 2026-07-17 约 9 周):
 
-**简历项目描述模板**（按上面做完后可以这么写）：
+1. **本周内** — Redis 限流(P1 #9,半天):凑齐"缓存 / 锁 / 限流"三件套,直接按 userId 维度
+2. **下周** — WebSocket(P1 #13,1 天)+ SSE 流式摘要(P1 #14,1 天):干掉 2.4s 轮询 + 打字机效果。**这两个做完 demo 视觉效果上一个台阶**
+3. **第 3-4 周** — AWS S3(P1 #12,2 天):S3 直传 + 按用户分前缀,顺便解决 `/uploads/**` 公开访问的安全隐患
+4. **第 5 周** — Docker 化(P2 #16,半天)+ 公网部署(P3 #28,1 天):产出 live demo URL,简历最关键的交付物
+5. **第 6 周后** — P0 #2 #7 这种小活清掉,剩下时间根据情况挑 P2
+6. **实习结束(7/17)后** — 3 周休假,只做 LeetCode
 
-> **VidInsight-AI** — 基于 LLM 的视频内容分析平台
-> - 全栈实现：Spring Boot 3 + React 19 + MyBatis-Plus + MySQL + Redis + RabbitMQ + MinIO
-> - **高并发与缓存**：Redis 缓存视频元数据（Cache Aside + 布隆过滤器解决穿透 + 互斥锁解决击穿）；Redisson 分布式锁防止重复分析；Lua 脚本实现令牌桶限流
-> - **异步解耦**：RabbitMQ + 死信队列实现视频导入与 AI 分析两阶段解耦，启动时自动恢复中断任务
-> - **实时通信**：WebSocket 推送分析状态，SSE 流式输出 AI 摘要
-> - **生产级特性**：Docker 多阶段构建、GitHub Actions CI/CD、Prometheus + Grafana 监控、OpenTelemetry 链路追踪
+⚠️ 已 dropped(不再考虑):MinIO(走 S3)、Elasticsearch、微服务拆分、K8s
+
+---
+
+## 简历项目描述模板
+
+按当前进度,实际能写的版本(全部对应代码里真做了的事):
+
+> **VidInsight-AI** — Full-stack video analysis platform with LLM-powered transcription and summarization
+> - **Stack**: Spring Boot 3.5 / Java 21 / MyBatis-Plus / React 19 / MySQL 8 / Redis / RabbitMQ
+> - **Auth & data isolation**: Spring Security 6 stateless JWT (jjwt 0.12, HS256, BCrypt), per-user video ownership enforced at every endpoint, MD5 dedup scoped to user to prevent cross-tenant data leak
+> - **Caching**: Redis Cache Aside with full write-path invalidation (per-user list keys evicted via SCAN, not KEYS); null-sentinel for penetration; jittered TTL for avalanche; Redisson RLock with WatchDog renewal + double-check for breakdown
+> - **Distributed locking**: Redisson RLock atomically dedupes concurrent uploads of the same file, eliminating redundant ASR + LLM calls
+> - **Async pipeline**: RabbitMQ-driven two-phase workflow (intake → analysis) with DLQ + idempotent MQ consumer; startup recovery resets orphaned IMPORTING rows
+> - **Chunked upload**: 5MB chunks, resumable, MD5 verified on merge
+
+下面这些做完后可以追加(目前还没做):
+
+> - **Rate limiting**: token-bucket via Redis Lua, per-user
+> - **Realtime**: WebSocket push replaces 2.4s polling; SSE streams LLM summary tokens
+> - **Object storage**: AWS S3 with per-user prefixed pre-signed URLs (frontend → S3 direct, bypasses backend)
+> - **Deployment**: Multi-stage Docker + GitHub Actions CI, live demo at `<URL>`
