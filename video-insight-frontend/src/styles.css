@@ -1561,6 +1561,10 @@ body:hover .cursor-glow,
   border-bottom: 1px solid var(--line);
   background: rgba(0, 0, 0, 0.2);
   backdrop-filter: blur(2px);
+  /* Bleed out past the brand panel's horizontal padding so the
+     marquee spans the full left half of the screen, edge to edge. */
+  margin-left: -56px;
+  margin-right: -56px;
 }
 .vi-auth-marquee-track {
   display: flex;
@@ -1911,6 +1915,7 @@ body:hover .cursor-glow,
     border-bottom: 1px solid var(--line);
   }
   .vi-auth-brand-content { padding: 28px; gap: 16px; }
+  .vi-auth-marquee { margin-left: -28px; margin-right: -28px; }
   .vi-auth-form-panel { padding: 36px 20px 68px; }
   .vi-auth-footer {
     padding: 10px 20px;
