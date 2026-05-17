@@ -80,7 +80,7 @@ public class SiliconFlowAiSummaryServiceImpl implements AiSummaryService {
                 1. Core summary
                 2. Key insights
                 3. Important quotes if any
-                4. Topic tags
+                4. Topic tags — output as a single line of inline-code tags separated by spaces, e.g. `#TagOne` `#TagTwo` `#TagThree`. Do NOT use bullet lists or tables for tags.
                 Be concise, factual, and structured.
                 """;
 

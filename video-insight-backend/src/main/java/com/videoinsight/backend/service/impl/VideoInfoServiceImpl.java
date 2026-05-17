@@ -184,7 +184,9 @@ public class VideoInfoServiceImpl extends ServiceImpl<VideoInfoMapper, VideoInfo
             throw new BusinessException(403, "you do not own this video");
         }
 
-        if (videoInfo.getVideoStatus() != VideoStatus.PENDING && videoInfo.getVideoStatus() != VideoStatus.FAILED) {
+        if (videoInfo.getVideoStatus() != VideoStatus.PENDING
+                && videoInfo.getVideoStatus() != VideoStatus.FAILED
+                && videoInfo.getVideoStatus() != VideoStatus.COMPLETED) {
             throw new BusinessException(400, "video status does not allow analysis");
         }
 

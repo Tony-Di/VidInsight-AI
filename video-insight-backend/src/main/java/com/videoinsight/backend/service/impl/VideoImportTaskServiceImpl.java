@@ -74,7 +74,7 @@ public class VideoImportTaskServiceImpl implements VideoImportTaskService {
             videoCacheService.evictDetail(videoInfo.getId());
             videoCacheService.evictUserLists(videoInfo.getUserId());
             videoStatusPushService.push(videoInfo.getUserId(),
-                    new VideoStatusPush(videoId, VideoStatus.PENDING.name(), null));
+                    new VideoStatusPush(videoId, VideoStatus.PENDING.name(), null, null));
         } catch (Exception exception) {
             log.error("Video import failed, videoId={}", videoId, exception);
             videoInfo.setVideoStatus(VideoStatus.IMPORT_FAILED);
@@ -84,7 +84,7 @@ public class VideoImportTaskServiceImpl implements VideoImportTaskService {
             videoCacheService.evictDetail(videoInfo.getId());
             videoCacheService.evictUserLists(videoInfo.getUserId());
             videoStatusPushService.push(videoInfo.getUserId(),
-                    new VideoStatusPush(videoId, VideoStatus.IMPORT_FAILED.name(), null));
+                    new VideoStatusPush(videoId, VideoStatus.IMPORT_FAILED.name(), null, null));
         } finally {
             deleteTempFile(downloadedFile);
         }
@@ -121,7 +121,7 @@ public class VideoImportTaskServiceImpl implements VideoImportTaskService {
             videoCacheService.evictDetail(videoInfo.getId());
             videoCacheService.evictUserLists(videoInfo.getUserId());
             videoStatusPushService.push(videoInfo.getUserId(),
-                    new VideoStatusPush(videoInfo.getId(), VideoStatus.COMPLETED.name(), videoInfo.getAudioUrl()));
+                    new VideoStatusPush(videoInfo.getId(), VideoStatus.COMPLETED.name(), videoInfo.getAudioUrl(), null));
             return true;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -147,13 +147,16 @@ public class VideoImportTaskServiceImpl implements VideoImportTaskService {
             return;
         }
         try {
-            Files.deleteIfExists(downloadedFile);
-            Path parent = downloadedFile.getParent();
-            if (parent != null) {
-                Files.deleteIfExists(parent);
+            Path dir = downloadedFile.getParent();
+            Path root = dir != null ? dir : downloadedFile;
+            try (var stream = Files.walk(root)) {
+                stream.sorted(java.util.Comparator.reverseOrder())
+                        .forEach(p -> {
+                            try { Files.deleteIfExists(p); } catch (IOException ignored) {}
+                        });
             }
         } catch (IOException exception) {
-            log.warn("Failed to delete imported temp file {}", downloadedFile, exception);
+            log.warn("Failed to delete imported temp dir {}", downloadedFile, exception);
         }
     }
 

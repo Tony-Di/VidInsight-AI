@@ -4,8 +4,10 @@ import com.videoinsight.backend.entity.VideoInfo;
 import com.videoinsight.backend.enums.VideoStatus;
 import com.videoinsight.backend.mapper.VideoInfoMapper;
 import com.videoinsight.backend.model.response.VideoAnalysisResult;
+import com.videoinsight.backend.service.AiSummaryService;
+import com.videoinsight.backend.service.MediaProcessingService;
+import com.videoinsight.backend.service.SpeechRecognitionService;
 import com.videoinsight.backend.service.VideoAnalysisJobService;
-import com.videoinsight.backend.service.VideoAnalysisService;
 import com.videoinsight.backend.service.VideoCacheService;
 import com.videoinsight.backend.websocket.VideoStatusPush;
 import com.videoinsight.backend.websocket.VideoStatusPushService;
@@ -22,7 +24,11 @@ public class VideoAnalysisJobServiceImpl implements VideoAnalysisJobService {
 
     private final VideoInfoMapper videoInfoMapper;
 
-    private final VideoAnalysisService videoAnalysisService;
+    private final MediaProcessingService mediaProcessingService;
+
+    private final SpeechRecognitionService speechRecognitionService;
+
+    private final AiSummaryService aiSummaryService;
 
     private final VideoCacheService videoCacheService;
 
@@ -43,17 +49,25 @@ public class VideoAnalysisJobServiceImpl implements VideoAnalysisJobService {
         }
 
         try {
-            VideoAnalysisResult result = videoAnalysisService.analyze(videoInfo);
+            pushStep(videoInfo, "EXTRACTING");
+            String audioUrl = mediaProcessingService.extractAudio(videoInfo);
+            videoInfo.setAudioUrl(audioUrl);
+
+            pushStep(videoInfo, "TRANSCRIBING");
+            String transcript = speechRecognitionService.transcribe(audioUrl);
+            videoInfo.setTranscript(transcript);
+
+            pushStep(videoInfo, "SUMMARIZING");
+            String summary = aiSummaryService.summarize(transcript);
+
             videoInfo.setVideoStatus(VideoStatus.COMPLETED);
-            videoInfo.setAudioUrl(result.getAudioUrl());
-            videoInfo.setTranscript(result.getTranscript());
-            videoInfo.setSummary(result.getSummary());
+            videoInfo.setSummary(summary);
             videoInfo.setUpdatedAt(LocalDateTime.now());
             videoInfoMapper.updateById(videoInfo);
             videoCacheService.evictDetail(videoId);
             videoCacheService.evictUserLists(videoInfo.getUserId());
             videoStatusPushService.push(videoInfo.getUserId(),
-                    new VideoStatusPush(videoId, VideoStatus.COMPLETED.name(), result.getAudioUrl()));
+                    new VideoStatusPush(videoId, VideoStatus.COMPLETED.name(), audioUrl, null));
         } catch (Exception exception) {
             log.error("Video analysis failed, videoId={}", videoId, exception);
             videoInfo.setVideoStatus(VideoStatus.FAILED);
@@ -63,8 +77,13 @@ public class VideoAnalysisJobServiceImpl implements VideoAnalysisJobService {
             videoCacheService.evictDetail(videoId);
             videoCacheService.evictUserLists(videoInfo.getUserId());
             videoStatusPushService.push(videoInfo.getUserId(),
-                    new VideoStatusPush(videoId, VideoStatus.FAILED.name(), null));
+                    new VideoStatusPush(videoId, VideoStatus.FAILED.name(), null, null));
         }
+    }
+
+    private void pushStep(VideoInfo videoInfo, String step) {
+        videoStatusPushService.push(videoInfo.getUserId(),
+                new VideoStatusPush(videoInfo.getId(), VideoStatus.PROCESSING.name(), null, step));
     }
 
     private String getRootCauseMessage(Exception exception) {

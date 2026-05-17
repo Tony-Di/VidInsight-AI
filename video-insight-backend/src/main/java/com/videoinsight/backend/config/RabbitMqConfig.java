@@ -86,11 +86,9 @@ public class RabbitMqConfig {
     @Bean
     public SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(
             SimpleRabbitListenerContainerFactoryConfigurer configurer,
-            ConnectionFactory connectionFactory,
-            @Qualifier("analysisTaskExecutor") Executor analysisTaskExecutor) {
+            ConnectionFactory connectionFactory) {
         SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
         configurer.configure(factory, connectionFactory);
-        factory.setTaskExecutor(analysisTaskExecutor);
         // 消费者抛异常时不重新入队，直接路由到 DLQ
         factory.setDefaultRequeueRejected(false);
         return factory;

@@ -9,6 +9,8 @@ import {
   type ReactNode,
 } from 'react';
 import { Client } from '@stomp/stompjs';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
   analyzeVideo,
   AUTH_REQUIRED_EVENT,
@@ -17,6 +19,7 @@ import {
   getCurrentUserApi,
   getStoredToken,
   getStoredUser,
+  getVideo,
   importVideoByUrl,
   listVideos,
   retryImport,
@@ -405,6 +408,12 @@ const STAGES: { key: I18nKey; pct: number }[] = [
   { key: 'stage_compose', pct: 94 },
 ];
 
+const STEP_STAGE: Record<string, { key: I18nKey; pct: number }> = {
+  EXTRACTING:  { key: 'stage_decode',     pct: 20 },
+  TRANSCRIBING: { key: 'stage_transcribe', pct: 55 },
+  SUMMARIZING:  { key: 'stage_compose',    pct: 85 },
+};
+
 /* ── Status → pill meta ─────────────────────────────────── */
 function getStatusMeta(
   status: VideoStatus,
@@ -523,7 +532,7 @@ function AppInner({ user, onLogout }: AppInnerProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshSpin, setRefreshSpin] = useState(false);
   const [lang, setLang] = useState<Lang>(getInitialLang);
-  const [stageIdx, setStageIdx] = useState(0);
+  const [processingSteps, setProcessingSteps] = useState<Record<number, string>>({});
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const cursorGlowRef = useRef<HTMLDivElement | null>(null);
@@ -657,19 +666,6 @@ function AppInner({ user, onLogout }: AppInnerProps) {
     };
   }, [page]);
 
-  /* Cycle stage label/pct for all PROCESSING cards (purely cosmetic
-     — backend does not expose per-stage progress). */
-  const hasProcessing = useMemo(
-    () => videos.some((v) => v.videoStatus === 'PROCESSING'),
-    [videos],
-  );
-  useEffect(() => {
-    if (!hasProcessing) return;
-    const id = window.setInterval(() => {
-      setStageIdx((i) => (i + 1) % STAGES.length);
-    }, 1300);
-    return () => window.clearInterval(id);
-  }, [hasProcessing]);
 
   useEffect(() => {
     const token = getStoredToken();
@@ -684,11 +680,26 @@ function AppInner({ user, onLogout }: AppInnerProps) {
 
     client.onConnect = () => {
       client.subscribe('/user/queue/video-status', (frame) => {
-        const push: { videoId: number; videoStatus: VideoStatus; audioUrl: string | null } =
+        const push: { videoId: number; videoStatus: VideoStatus; audioUrl: string | null; step?: string } =
           JSON.parse(frame.body);
 
         if (push.videoStatus === 'PENDING') {
           setTimeout(() => void handleStartAnalysis({ id: push.videoId } as VideoInfo), 0);
+          return;
+        }
+
+        if (push.videoStatus === 'PROCESSING' && push.step) {
+          setProcessingSteps((prev) => ({ ...prev, [push.videoId]: push.step! }));
+          return;
+        }
+
+        const TERMINAL = new Set(['COMPLETED', 'FAILED', 'IMPORT_FAILED']);
+        if (TERMINAL.has(push.videoStatus)) {
+          setProcessingSteps((prev) => { const n = { ...prev }; delete n[push.videoId]; return n; });
+          void getVideo(push.videoId).then((full) => {
+            setVideos((curr) => curr.map((v) => (v.id === full.id ? full : v)));
+            setActiveVideo((curr) => (curr?.id === full.id ? full : curr));
+          });
           return;
         }
 
@@ -1241,7 +1252,8 @@ function AppInner({ user, onLogout }: AppInnerProps) {
                 ? t('source_local')
                 : t('source_web');
               const staggerIdx = Math.min(idx + 2, 6);
-              const stage = STAGES[stageIdx];
+              const stepKey = processingSteps[video.id];
+              const stage = (stepKey && STEP_STAGE[stepKey]) ?? STAGES[0];
 
               return (
                 <article
@@ -1271,8 +1283,8 @@ function AppInner({ user, onLogout }: AppInnerProps) {
                       <div className="vi-stage-strip">
                         <span className="vi-stage-text">
                           <span className="idx">
-                            {String(stageIdx + 1).padStart(2, '0')}/
-                            {STAGES.length}
+                            {String(Object.keys(STEP_STAGE).indexOf(stepKey ?? '') + 1 || 1).padStart(2, '0')}/
+                            {Object.keys(STEP_STAGE).length}
                           </span>
                           &nbsp;&nbsp;{t(stage.key)}
                           <span className="ellipsis">…</span>
@@ -1435,7 +1447,11 @@ function AppInner({ user, onLogout }: AppInnerProps) {
                   </div>
                 )
               ) : activeVideo.summary ? (
-                <p className="vi-modal-text">{activeVideo.summary}</p>
+                <div className="vi-modal-markdown">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {activeVideo.summary}
+                  </ReactMarkdown>
+                </div>
               ) : (
                 <div className="vi-modal-empty">
                   {activeVideo.videoStatus === 'PROCESSING' ? (
