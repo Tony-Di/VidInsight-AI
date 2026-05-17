@@ -242,7 +242,3 @@ VidInsight-AI/
 ## 贡献与支持
 
 欢迎提 PR 和 Issue。如果这个项目对你有帮助，请给个 ⭐。
-
----
-
-*© 2026 VidInsight AI · MIT License*

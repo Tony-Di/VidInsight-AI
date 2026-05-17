@@ -243,6 +243,3 @@ VidInsight-AI/
 
 PRs and issues are welcome. If this project helped you, a ⭐ is appreciated.
 
----
-
-*© 2026 VidInsight AI · MIT License*
