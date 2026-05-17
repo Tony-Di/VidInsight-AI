@@ -43,7 +43,8 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
-                                "/uploads/**"
+                                "/uploads/**",
+                                "/ws/**"
                         ).permitAll()
                         // OPTIONS preflight 必须放行,否则浏览器 CORS 先死在这里。
                         .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()

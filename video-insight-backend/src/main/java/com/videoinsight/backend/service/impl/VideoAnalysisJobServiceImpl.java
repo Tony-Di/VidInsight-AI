@@ -7,6 +7,8 @@ import com.videoinsight.backend.model.response.VideoAnalysisResult;
 import com.videoinsight.backend.service.VideoAnalysisJobService;
 import com.videoinsight.backend.service.VideoAnalysisService;
 import com.videoinsight.backend.service.VideoCacheService;
+import com.videoinsight.backend.websocket.VideoStatusPush;
+import com.videoinsight.backend.websocket.VideoStatusPushService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,8 @@ public class VideoAnalysisJobServiceImpl implements VideoAnalysisJobService {
     private final VideoAnalysisService videoAnalysisService;
 
     private final VideoCacheService videoCacheService;
+
+    private final VideoStatusPushService videoStatusPushService;
 
     @Override
     public void executeAnalysis(Long videoId) {
@@ -48,6 +52,8 @@ public class VideoAnalysisJobServiceImpl implements VideoAnalysisJobService {
             videoInfoMapper.updateById(videoInfo);
             videoCacheService.evictDetail(videoId);
             videoCacheService.evictUserLists(videoInfo.getUserId());
+            videoStatusPushService.push(videoInfo.getUserId(),
+                    new VideoStatusPush(videoId, VideoStatus.COMPLETED.name(), result.getAudioUrl()));
         } catch (Exception exception) {
             log.error("Video analysis failed, videoId={}", videoId, exception);
             videoInfo.setVideoStatus(VideoStatus.FAILED);
@@ -56,6 +62,8 @@ public class VideoAnalysisJobServiceImpl implements VideoAnalysisJobService {
             videoInfoMapper.updateById(videoInfo);
             videoCacheService.evictDetail(videoId);
             videoCacheService.evictUserLists(videoInfo.getUserId());
+            videoStatusPushService.push(videoInfo.getUserId(),
+                    new VideoStatusPush(videoId, VideoStatus.FAILED.name(), null));
         }
     }
 

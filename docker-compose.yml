@@ -10,6 +10,7 @@ services:
       - "3306:3306"
     volumes:
       - mysql-data:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p123456"]
       interval: 10s
@@ -51,7 +52,5 @@ services:
 
 volumes:
   mysql-data:
-    name: vidinsight-mysql-data
-    external: true
   rabbitmq-data:
   redis-data:

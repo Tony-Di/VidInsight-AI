@@ -34,7 +34,7 @@
 | 10 | Redis 进度存储 | 替代之前讨论的"内存 Map"，把 yt-dlp 下载进度 / 分析进度存 Redis，前端轮询读取 | Redis Hash | 半天 | ★★★ |
 | 11 | ~~用户体系 + JWT~~ | ~~后端:Spring Security 6 无状态 filter chain / JWT(jjwt 0.12) HS256 24h / BCrypt 密码哈希 / 视频按 user_id 隔离 / MD5 去重按用户限定避免跨用户数据泄漏 / CORS preflight 走独立 CorsConfigurationSource。前端:Auth 页 + token 注入 + 401 全局事件 + 乐观渲染恢复登录态~~ | ~~Spring Security 6、jjwt 0.12、BCrypt、React~~ | **已完成（前后端）** | ★★★★★ |
 | 12 | AWS S3 对象存储 | 把本地 uploads 替换为 S3,前端用预签名 URL 直传(绕过后端流量)。S3 key 按用户分前缀(`s3://bucket/user-{id}/...`)。**取代之前的 MinIO 方案**——目标是真公网部署 | AWS SDK v2、预签名 URL | 2 天 | ★★★★★ |
-| 13 | WebSocket 实时推送 | 替代前端 2.4s 轮询，分析状态变化时主动推送给前端 | Spring WebSocket / STOMP | 1 天 | ★★★★ |
+| 13 | ~~WebSocket 实时推送~~ | ~~替代前端 2.4s 轮询，分析状态变化时主动推送给前端。后端:STOMP over WebSocket，JWT 认证拦截器(`WebSocketAuthInterceptor`)，`VideoStatusPushService` 注入分析/导入服务，状态变更后推送。前端:@stomp/stompjs 替代 setInterval 轮询，PENDING 时自动触发 analyzeVideo~~ | ~~Spring WebSocket / STOMP、@stomp/stompjs~~ | **已完成** | ★★★★ |
 | 14 | AI 总结流式输出 | SiliconFlow chat 接口改为 stream=true，后端用 SSE 推给前端，实现"打字机效果" | SSE、Reactive | 1 天 | ★★★★ |
 
 ---
@@ -75,8 +75,8 @@
 
 ⏳ **下一步建议顺序**(距实习结束 2026-07-17 约 9 周):
 
-1. **本周内** — Redis 限流(P1 #9,半天):凑齐"缓存 / 锁 / 限流"三件套,直接按 userId 维度
-2. **下周** — WebSocket(P1 #13,1 天)+ SSE 流式摘要(P1 #14,1 天):干掉 2.4s 轮询 + 打字机效果。**这两个做完 demo 视觉效果上一个台阶**
+1. ~~**本周内** — Redis 限流(P1 #9,半天):凑齐"缓存 / 锁 / 限流"三件套,直接按 userId 维度~~ **已完成**
+2. ~~**下周** — WebSocket(P1 #13,1 天)~~ **已完成** + SSE 流式摘要(P1 #14,1 天):打字机效果。**下一个优先级**
 3. **第 3-4 周** — AWS S3(P1 #12,2 天):S3 直传 + 按用户分前缀,顺便解决 `/uploads/**` 公开访问的安全隐患
 4. **第 5 周** — Docker 化(P2 #16,半天)+ 公网部署(P3 #28,1 天):产出 live demo URL,简历最关键的交付物
 5. **第 6 周后** — P0 #2 #7 这种小活清掉,剩下时间根据情况挑 P2

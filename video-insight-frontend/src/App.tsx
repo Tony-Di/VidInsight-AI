@@ -8,6 +8,7 @@ import {
   type DragEvent as ReactDragEvent,
   type ReactNode,
 } from 'react';
+import { Client } from '@stomp/stompjs';
 import {
   analyzeVideo,
   AUTH_REQUIRED_EVENT,
@@ -16,7 +17,6 @@ import {
   getCurrentUserApi,
   getStoredToken,
   getStoredUser,
-  getVideo,
   importVideoByUrl,
   listVideos,
   retryImport,
@@ -35,8 +35,6 @@ type Lang = 'zh' | 'en';
 type Source = 'file' | 'url';
 type StatusTone = 'ok' | 'warn' | 'err' | 'neutral' | 'accent';
 type ActionTone = 'neutral' | 'accent' | 'err';
-
-const POLLING_STATUSES = new Set<VideoStatus>(['IMPORTING', 'PROCESSING']);
 
 const TRANSLATIONS = {
   zh: {
@@ -527,7 +525,6 @@ function AppInner({ user, onLogout }: AppInnerProps) {
   const [lang, setLang] = useState<Lang>(getInitialLang);
   const [stageIdx, setStageIdx] = useState(0);
 
-  const pollTimerRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const cursorGlowRef = useRef<HTMLDivElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -675,40 +672,45 @@ function AppInner({ user, onLogout }: AppInnerProps) {
   }, [hasProcessing]);
 
   useEffect(() => {
-    if (pollTimerRef.current) {
-      window.clearInterval(pollTimerRef.current);
-      pollTimerRef.current = null;
-    }
-    if (!activeVideo || !POLLING_STATUSES.has(activeVideo.videoStatus)) return;
+    const token = getStoredToken();
+    if (!token) return;
 
-    pollTimerRef.current = window.setInterval(async () => {
-      try {
-        const latest = await getVideo(activeVideo.id);
-        if (activeVideo.videoStatus === 'IMPORTING' && latest.videoStatus === 'PENDING') {
-          const analyzing = await analyzeVideo(latest.id);
-          setActiveVideo(analyzing);
-          setVideos((curr) => curr.map((v) => (v.id === analyzing.id ? analyzing : v)));
+    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const client = new Client({
+      brokerURL: `${protocol}://${window.location.host}/ws/websocket`,
+      connectHeaders: { Authorization: `Bearer ${token}` },
+      reconnectDelay: 5000,
+    });
+
+    client.onConnect = () => {
+      client.subscribe('/user/queue/video-status', (frame) => {
+        const push: { videoId: number; videoStatus: VideoStatus; audioUrl: string | null } =
+          JSON.parse(frame.body);
+
+        if (push.videoStatus === 'PENDING') {
+          setTimeout(() => void handleStartAnalysis({ id: push.videoId } as VideoInfo), 0);
           return;
         }
 
-        setActiveVideo(latest);
-        setVideos((curr) => curr.map((v) => (v.id === latest.id ? latest : v)));
-        if (!POLLING_STATUSES.has(latest.videoStatus) && pollTimerRef.current) {
-          window.clearInterval(pollTimerRef.current);
-          pollTimerRef.current = null;
-        }
-      } catch {
-        if (pollTimerRef.current) {
-          window.clearInterval(pollTimerRef.current);
-          pollTimerRef.current = null;
-        }
-      }
-    }, 2400);
-
-    return () => {
-      if (pollTimerRef.current) window.clearInterval(pollTimerRef.current);
+        setVideos((curr) =>
+          curr.map((v) =>
+            v.id === push.videoId
+              ? { ...v, videoStatus: push.videoStatus, audioUrl: push.audioUrl ?? v.audioUrl }
+              : v,
+          ),
+        );
+        setActiveVideo((curr) =>
+          curr?.id === push.videoId
+            ? { ...curr, videoStatus: push.videoStatus, audioUrl: push.audioUrl ?? curr.audioUrl }
+            : curr,
+        );
+      });
     };
-  }, [activeVideo]);
+
+    client.activate();
+    return () => { void client.deactivate(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user.id]);
 
   const handleRefresh = () => {
     if (refreshing) return;

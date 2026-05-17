@@ -548,11 +548,12 @@ body:hover .cursor-glow,
 .vi-main {
   flex: 1 1 auto;
   width: 100%;
-  max-width: 880px;
+  max-width: 960px;
   margin: 0 auto;
-  padding: 0 24px 56px;
+  padding: 48px 24px 64px;
   display: flex;
   flex-direction: column;
+  justify-content: center;
 }
 
 .vi-main-wb {
@@ -565,8 +566,8 @@ body:hover .cursor-glow,
 
 /* ── Home / Hero ─────────────────────────────────────────── */
 .vi-hero {
-  padding-top: 80px;
-  padding-bottom: 32px;
+  padding-top: 0;
+  padding-bottom: 40px;
   text-align: center;
 }
 
@@ -603,7 +604,7 @@ body:hover .cursor-glow,
 
 .vi-hero-title {
   margin: 0;
-  font-size: clamp(36px, 6vw, 64px);
+  font-size: clamp(36px, 5vw, 76px);
   line-height: 1.02;
   letter-spacing: -0.03em;
   font-weight: 500;
@@ -1358,7 +1359,7 @@ body:hover .cursor-glow,
 
 /* ── Responsive ──────────────────────────────────────────── */
 @media (max-width: 720px) {
-  .vi-hero { padding-top: 48px; padding-bottom: 24px; }
+  .vi-hero { padding-bottom: 24px; }
   .vi-panel-grid { grid-template-columns: 1fr; }
   .vi-col + .vi-col { border-left: 0; border-top: 1px solid var(--line); }
   .vi-task-grid { grid-template-columns: 1fr; }
@@ -1366,7 +1367,7 @@ body:hover .cursor-glow,
 
 @media (max-width: 560px) {
   .vi-header-inner { padding: 0 16px; }
-  .vi-main { padding: 0 16px 40px; }
+  .vi-main { padding: 24px 16px 40px; }
   .vi-main-wb { padding: 24px 16px 40px; }
   .vi-hero-title { font-size: 36px; }
   .vi-wb-h1 { font-size: 22px; }

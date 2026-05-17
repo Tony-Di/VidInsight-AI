@@ -8,6 +8,8 @@ import com.videoinsight.backend.service.VideoCacheService;
 import com.videoinsight.backend.service.VideoDownloadService;
 import com.videoinsight.backend.service.VideoImportTaskService;
 import com.videoinsight.backend.util.FileHashUtil;
+import com.videoinsight.backend.websocket.VideoStatusPush;
+import com.videoinsight.backend.websocket.VideoStatusPushService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
@@ -39,6 +41,8 @@ public class VideoImportTaskServiceImpl implements VideoImportTaskService {
 
     private final RedissonClient redissonClient;
 
+    private final VideoStatusPushService videoStatusPushService;
+
     @Async("analysisTaskExecutor")
     @Override
     public void submitImport(Long videoId, String sourceUrl) {
@@ -69,6 +73,8 @@ public class VideoImportTaskServiceImpl implements VideoImportTaskService {
             videoInfoMapper.updateById(videoInfo);
             videoCacheService.evictDetail(videoInfo.getId());
             videoCacheService.evictUserLists(videoInfo.getUserId());
+            videoStatusPushService.push(videoInfo.getUserId(),
+                    new VideoStatusPush(videoId, VideoStatus.PENDING.name(), null));
         } catch (Exception exception) {
             log.error("Video import failed, videoId={}", videoId, exception);
             videoInfo.setVideoStatus(VideoStatus.IMPORT_FAILED);
@@ -77,6 +83,8 @@ public class VideoImportTaskServiceImpl implements VideoImportTaskService {
             videoInfoMapper.updateById(videoInfo);
             videoCacheService.evictDetail(videoInfo.getId());
             videoCacheService.evictUserLists(videoInfo.getUserId());
+            videoStatusPushService.push(videoInfo.getUserId(),
+                    new VideoStatusPush(videoId, VideoStatus.IMPORT_FAILED.name(), null));
         } finally {
             deleteTempFile(downloadedFile);
         }
@@ -112,6 +120,8 @@ public class VideoImportTaskServiceImpl implements VideoImportTaskService {
             videoInfoMapper.updateById(videoInfo);
             videoCacheService.evictDetail(videoInfo.getId());
             videoCacheService.evictUserLists(videoInfo.getUserId());
+            videoStatusPushService.push(videoInfo.getUserId(),
+                    new VideoStatusPush(videoInfo.getId(), VideoStatus.COMPLETED.name(), videoInfo.getAudioUrl()));
             return true;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
