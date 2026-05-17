@@ -30,7 +30,7 @@
 |---|------|------|---------|-------|---------|
 | 7 | ~~Redis 缓存层~~ | ~~Cache Aside 读写流程 / 防穿透（空值哨兵 + 短 TTL）/ 防雪崩（TTL 随机抖动）/ 防击穿（互斥锁，与 #8 合并实现）~~ | ~~Spring Data Redis、Lettuce、ThreadLocalRandom~~ | **已完成** | ★★★★★ |
 | 8 | ~~Redis 分布式锁~~ | ~~MD5 去重场景加分布式锁，防止两个相同视频同时上传各自走完整流水线；同时承接 #7 的缓存击穿（热点 key 回源互斥）；Redisson RLock 实现（WatchDog 自动续期 + 双重检查 + 超时降级）~~ | ~~Redisson RLock~~ | **已完成** | ★★★★★ |
-| 9 | Redis 限流 | 接口限流（如导入接口限制每用户每分钟 5 次），Lua 脚本实现令牌桶 | Redis Lua | 半天 | ★★★★ |
+| 9 | ~~Redis 限流~~ | ~~接口限流（如导入接口限制每用户每分钟 5 次），Lua 脚本实现令牌桶；`@RateLimit` AOP 注解，USER/IP 两种维度，fail-open 降级，HTTP 429~~ | ~~Redis Lua、Spring AOP~~ | **已完成** | ★★★★ |
 | 10 | Redis 进度存储 | 替代之前讨论的"内存 Map"，把 yt-dlp 下载进度 / 分析进度存 Redis，前端轮询读取 | Redis Hash | 半天 | ★★★ |
 | 11 | ~~用户体系 + JWT~~ | ~~后端:Spring Security 6 无状态 filter chain / JWT(jjwt 0.12) HS256 24h / BCrypt 密码哈希 / 视频按 user_id 隔离 / MD5 去重按用户限定避免跨用户数据泄漏 / CORS preflight 走独立 CorsConfigurationSource。前端:Auth 页 + token 注入 + 401 全局事件 + 乐观渲染恢复登录态~~ | ~~Spring Security 6、jjwt 0.12、BCrypt、React~~ | **已完成（前后端）** | ★★★★★ |
 | 12 | AWS S3 对象存储 | 把本地 uploads 替换为 S3,前端用预签名 URL 直传(绕过后端流量)。S3 key 按用户分前缀(`s3://bucket/user-{id}/...`)。**取代之前的 MinIO 方案**——目标是真公网部署 | AWS SDK v2、预签名 URL | 2 天 | ★★★★★ |
@@ -71,7 +71,7 @@
 
 ✅ **已完成**:
 - P0 全部除了 #2(PROCESSING 卡死恢复)和 #7(定时清理)
-- P1 #7(Redis 缓存层)、#8(Redisson 分布式锁)、#11(JWT 前后端)、新增 #8(列表缓存写路径失效)
+- P1 #7(Redis 缓存层)、#8(Redisson 分布式锁)、#9(Redis 限流)、#11(JWT 前后端)、新增 #8(列表缓存写路径失效)
 
 ⏳ **下一步建议顺序**(距实习结束 2026-07-17 约 9 周):
 
