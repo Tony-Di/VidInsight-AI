@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -36,13 +37,22 @@ public class YtDlpVideoDownloadServiceImpl implements VideoDownloadService {
             Path logFile = tempDir.resolve("yt-dlp.log").normalize();
 
             List<String> command = buildCommand(sourceUrl, tempFile);
-            Process process = new ProcessBuilder(command)
+            ProcessBuilder processBuilder = new ProcessBuilder(command)
                     .redirectErrorStream(true)
-                    .redirectOutput(logFile.toFile())
-                    .start();
+                    .redirectOutput(logFile.toFile());
+            // Force yt-dlp (Python) to emit UTF-8 regardless of the host's ANSI code page,
+            // so the log we read back is decodable. Without this, Chinese-Windows hosts
+            // write GBK bytes that crash Files.readString as MalformedInputException.
+            processBuilder.environment().put("PYTHONIOENCODING", "utf-8");
+            Process process = processBuilder.start();
 
             boolean finished = process.waitFor(ytDlpProperties.getDownloadTimeoutMinutes(), TimeUnit.MINUTES);
-            String logs = Files.exists(logFile) ? Files.readString(logFile) : "";
+            // Use new String(bytes, UTF_8) instead of Files.readString — the former uses
+            // CodingErrorAction.REPLACE, so any stray non-UTF-8 bytes degrade to U+FFFD
+            // rather than aborting an otherwise-successful download.
+            String logs = Files.exists(logFile)
+                    ? new String(Files.readAllBytes(logFile), StandardCharsets.UTF_8)
+                    : "";
             if (!finished) {
                 process.destroyForcibly();
                 throw new IllegalStateException("yt-dlp download timed out after "

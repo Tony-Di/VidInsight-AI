@@ -221,24 +221,6 @@ VidInsight-AI/
         └── api.ts                  # 类型化 API 客户端
 ```
 
----
-
-## 简历描述参考
-
-> 以下内容均对应真实代码实现，可直接用于简历：
-
-**VidInsight AI** — 全栈视频分析平台，集成大模型转写与智能总结
-
-- **技术栈**：Spring Boot 3.5 / Java 21 / MyBatis-Plus / React 19 / MySQL 8 / Redis / RabbitMQ
-- **鉴权与隔离**：Spring Security 6 无状态 JWT（HS256、BCrypt），每个接口均按 `userId` 隔离；MD5 去重按用户限定，防止跨租户数据泄漏
-- **缓存**：Redis Cache Aside 全写路径失效（`SCAN + DEL`，非 `KEYS`）；空值哨兵防穿透；抖动 TTL 防雪崩；Redisson RLock + WatchDog + 双重检查防击穿
-- **异步管道**：RabbitMQ 两阶段流水线（导入 → 分析），带 DLQ 和幂等消费者；启动恢复 Runner 重置孤儿任务
-- **实时推送**：WebSocket/STOMP 替代 2.4 s 轮询；三阶段分析进度（`EXTRACTING → TRANSCRIBING → SUMMARIZING`）按视频独立推送
-- **限流**：Redis Lua 令牌桶，`@RateLimit` AOP 注解，按用户/按 IP 双维度，超限 HTTP 429
-- **分片上传**：5 MB 分片，断点续传，合并时 MD5 校验；分布式锁对相同文件并发上传去重
-
----
-
 ## 贡献与支持
 
 欢迎提 PR 和 Issue。如果这个项目对你有帮助，请给个 ⭐。

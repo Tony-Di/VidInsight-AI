@@ -397,7 +397,7 @@ function IconEmpty({ size = 48, stroke = 1 }: IconProps) {
 }
 
 const FILE_FORMATS = ['mp4', 'mov', 'avi', 'mkv', 'webm'];
-const LINK_SOURCES = ['bilibili', 'youtube', 'douyin', 'vimeo', 'm3u8'];
+const LINK_SOURCES = ['youtube', 'douyin', 'vimeo', 'm3u8'];
 
 const STAGES: { key: I18nKey; pct: number }[] = [
   { key: 'stage_queue', pct: 4 },

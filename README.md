@@ -221,24 +221,6 @@ VidInsight-AI/
         └── api.ts                  # Typed API client
 ```
 
----
-
-## Resume Highlights
-
-> Below is an accurate project description you can adapt for your resume (all points correspond to real code):
-
-**VidInsight AI** — Full-stack video analysis platform with LLM-powered transcription and summarization
-
-- **Stack**: Spring Boot 3.5 / Java 21 / MyBatis-Plus / React 19 / MySQL 8 / Redis / RabbitMQ
-- **Auth & isolation**: Spring Security 6 stateless JWT (HS256, BCrypt), per-user video ownership at every endpoint; MD5 dedup scoped per-user to prevent cross-tenant data leaks
-- **Caching**: Redis Cache Aside with full write-path invalidation (per-user list keys evicted via `SCAN`, not `KEYS`); null-sentinel for penetration; jittered TTL for avalanche; Redisson RLock + WatchDog + double-check for hot-key breakdown
-- **Async pipeline**: RabbitMQ two-phase workflow (import → analysis) with DLQ + idempotent consumer; startup runner resets orphaned rows
-- **Realtime**: WebSocket/STOMP replaces 2.4 s polling; three-phase analysis progress (`EXTRACTING → TRANSCRIBING → SUMMARIZING`) streamed per-video
-- **Rate limiting**: token-bucket via Redis Lua, `@RateLimit` AOP annotation, per-user and per-IP, HTTP 429
-- **Chunked upload**: 5 MB chunks, resumable, MD5 verified on merge; distributed lock deduplicates concurrent identical uploads
-
----
-
 ## Contributing
 
 PRs and issues are welcome. If this project helped you, a ⭐ is appreciated.
