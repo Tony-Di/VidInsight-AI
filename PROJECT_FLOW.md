@@ -45,7 +45,7 @@
 │                                                              │
 │  外部进程:yt-dlp(下载)、ffmpeg(抽音)                  │
 │  外部 HTTP:SiliconFlow 平台                                │
-│       ├─ /audio/transcriptions   TeleAI/TeleSpeechASR       │
+│       ├─ /audio/transcriptions   FunAudioLLM/SenseVoiceSmall       │
 │       └─ /chat/completions       deepseek-ai/DeepSeek-V4-Flash │
 └──────┬─────────────────┬────────────────┬───────────────────┘
        │                 │                │
@@ -385,7 +385,7 @@ Body:
   --boundary
   Content-Disposition: form-data; name="model"
 
-  TeleAI/TeleSpeechASR
+  FunAudioLLM/SenseVoiceSmall
   --boundary
   Content-Disposition: form-data; name="file"; filename="{videoId}.mp3"
   Content-Type: application/octet-stream
@@ -626,7 +626,7 @@ useEffect(() => {
 
 ```properties
 ai.siliconflow.base-url=https://api.siliconflow.cn/v1
-ai.siliconflow.asr-model=TeleAI/TeleSpeechASR
+ai.siliconflow.asr-model=FunAudioLLM/SenseVoiceSmall
 ai.siliconflow.chat-model=deepseek-ai/DeepSeek-V4-Flash
 ```
 

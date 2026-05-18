@@ -32,16 +32,22 @@
 
 ## Preview
 
-> **Screenshots placeholder** — add your own screenshots here once the app is running.
+### Landing Page
+Marketing hero — login / register entry with JWT-based auth.
 
-| Page | Description |
-|------|-------------|
-| `[screenshot: login page]` | JWT-based auth, BCrypt passwords |
-| `[screenshot: home page]` | Drag-drop upload + URL import |
-| `[screenshot: workbench]` | Per-user video task list with live status |
-| `[screenshot: analysis modal]` | Real-time EXTRACTING → TRANSCRIBING → SUMMARIZING progress |
-| `[screenshot: transcript tab]` | Full ASR transcript |
-| `[screenshot: AI summary tab]` | DeepSeek-generated summary |
+![Landing Page](docs/images/landing_page.png)
+
+### Upload Page
+Drag-drop file upload + URL import (YouTube and other platforms).
+
+![Upload Page](docs/images/home_page.png)
+
+### Workbench
+Per-user video task list with live status and real-time progress.
+
+![Workbench](docs/images/workbench.png)
+
+> More coming soon: analysis modal (EXTRACTING → TRANSCRIBING → SUMMARIZING), transcript tab, AI summary tab.
 
 ---
 
@@ -75,7 +81,7 @@
 | **Database** | MySQL 8 |
 | **Cache / Lock** | Redis · Lettuce · Redisson RLock |
 | **Messaging** | RabbitMQ (DLQ + idempotent consumer) |
-| **AI** | SiliconFlow ASR (`TeleAI/TeleSpeechASR`) · DeepSeek (`DeepSeek-V4-Flash`) |
+| **AI** | SiliconFlow ASR (`FunAudioLLM/SenseVoiceSmall`) · DeepSeek (`DeepSeek-V4-Flash`) |
 | **Media tools** | ffmpeg (audio extraction) · yt-dlp (video download) |
 
 ---

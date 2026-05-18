@@ -32,16 +32,22 @@
 
 ## 项目预览
 
-> **截图占位符** — 运行项目后在此处替换为真实截图。
+### 首页
+营销主页 — 登录 / 注册入口，JWT 鉴权。
 
-| 页面 | 说明 |
-|------|------|
-| `[截图: 登录/注册]` | JWT 鉴权，BCrypt 密码哈希 |
-| `[截图: 首页]` | 拖拽上传 + URL 导入 |
-| `[截图: 工作台]` | 按用户隔离的视频任务列表，实时状态 |
-| `[截图: 分析弹窗]` | 实时三阶段进度：解码音频 → 转写文字 → 生成总结 |
-| `[截图: 字幕标签页]` | ASR 完整字幕 |
-| `[截图: AI 总结标签页]` | DeepSeek 生成的结构化总结 |
+![Landing Page](docs/images/landing_page.png)
+
+### 上传页面
+拖拽上传 + URL 导入（YouTube 等平台）。
+
+![Upload Page](docs/images/home_page.png)
+
+### 工作台
+按用户隔离的视频任务列表，实时状态更新与进度反馈。
+
+![Workbench](docs/images/workbench.png)
+
+> 后续更新：分析弹窗（解码音频 → 转写文字 → 生成总结）、字幕标签页、AI 总结标签页。
 
 ---
 
@@ -75,7 +81,7 @@
 | **数据库** | MySQL 8 |
 | **缓存 / 分布式锁** | Redis · Lettuce · Redisson RLock |
 | **消息队列** | RabbitMQ（DLQ + 幂等消费者）|
-| **AI 接口** | 硅基流动 ASR（`TeleAI/TeleSpeechASR`）· DeepSeek（`DeepSeek-V4-Flash`）|
+| **AI 接口** | 硅基流动 ASR（`FunAudioLLM/SenseVoiceSmall`）· DeepSeek（`DeepSeek-V4-Flash`）|
 | **媒体工具** | ffmpeg（音频提取）· yt-dlp（视频下载）|
 
 ---
