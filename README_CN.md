@@ -47,7 +47,20 @@
 
 ![Workbench](docs/images/workbench.png)
 
-> 后续更新：分析弹窗（解码音频 → 转写文字 → 生成总结）、字幕标签页、AI 总结标签页。
+### 详情弹窗 · 视频
+内嵌原视频，方便查看结果时左右对照。
+
+![Video Tab](docs/images/video.png)
+
+### 详情弹窗 · 字幕
+SiliconFlow（SenseVoiceSmall）生成的 ASR 完整字幕。
+
+![Transcript Tab](docs/images/transcript.png)
+
+### 详情弹窗 · AI 总结
+DeepSeek-V4-Flash 生成的结构化总结。
+
+![AI Summary Tab](docs/images/summary.png)
 
 ---
 
