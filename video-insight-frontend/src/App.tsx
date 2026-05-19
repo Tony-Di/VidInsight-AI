@@ -1309,7 +1309,7 @@ function AppInner({ user, onLogout }: AppInnerProps) {
                           icon={<IconAudio />}
                           label={t('action_audio')}
                           enabled={hasAudio}
-                          href={hasAudio ? video.audioUrl : undefined}
+                          href={hasAudio ? (video.audioPlayUrl ?? video.audioUrl) : undefined}
                         />
                         <ActionBtn
                           icon={<IconDoc />}
@@ -1424,7 +1424,7 @@ function AppInner({ user, onLogout }: AppInnerProps) {
                 activeVideo.sourceUrl && activeVideo.sourceUrl.startsWith('/uploads/') ? (
                   <video
                     className="vi-modal-video"
-                    src={activeVideo.sourceUrl}
+                    src={activeVideo.playUrl ?? activeVideo.sourceUrl}
                     controls
                     preload="metadata"
                   />

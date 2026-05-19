@@ -121,7 +121,8 @@ public class VideoImportTaskServiceImpl implements VideoImportTaskService {
             videoCacheService.evictDetail(videoInfo.getId());
             videoCacheService.evictUserLists(videoInfo.getUserId());
             videoStatusPushService.push(videoInfo.getUserId(),
-                    new VideoStatusPush(videoInfo.getId(), VideoStatus.COMPLETED.name(), videoInfo.getAudioUrl(), null));
+                    new VideoStatusPush(videoInfo.getId(), VideoStatus.COMPLETED.name(),
+                            fileStorageService.publicUrl(videoInfo.getAudioUrl()), null));
             return true;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

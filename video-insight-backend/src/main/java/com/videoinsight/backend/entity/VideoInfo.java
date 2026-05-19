@@ -50,4 +50,12 @@ public class VideoInfo {
     @Schema(description = "Last update time.")
     private LocalDateTime updatedAt;
 
+    @TableField(exist = false)
+    @Schema(description = "Browser-playable video URL (presigned for S3, same as sourceUrl for local storage).")
+    private String playUrl;
+
+    @TableField(exist = false)
+    @Schema(description = "Browser-playable audio URL (presigned for S3, same as audioUrl for local storage).")
+    private String audioPlayUrl;
+
 }

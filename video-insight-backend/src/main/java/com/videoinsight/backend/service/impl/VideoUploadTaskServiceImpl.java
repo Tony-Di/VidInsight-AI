@@ -13,6 +13,7 @@ import com.videoinsight.backend.model.response.ChunkUploadInitResponse;
 import com.videoinsight.backend.model.response.ChunkUploadResponse;
 import com.videoinsight.backend.security.SecurityUtil;
 import com.videoinsight.backend.service.FileStorageService;
+import com.videoinsight.backend.service.LocalAccess;
 import com.videoinsight.backend.service.VideoCacheService;
 import com.videoinsight.backend.service.VideoUploadTaskService;
 import com.videoinsight.backend.util.FileHashUtil;
@@ -141,7 +142,10 @@ public class VideoUploadTaskServiceImpl extends ServiceImpl<VideoUploadTaskMappe
             // MD5 去重:合并完成后计算文件哈希,复用已有的分析结果。
             // 用 Redisson 分布式锁串行化"查 + 创建"过程,防止两个相同文件并发上传
             // 同时通过 findCompletedByMd5 检查 + 各自 INSERT 一行,导致两条同 MD5 记录都跑 ASR/LLM
-            String md5 = computeMd5OrNull(fileStorageService.resolveLocalPath(sourceUrl));
+            String md5;
+            try (LocalAccess access = fileStorageService.accessLocal(sourceUrl)) {
+                md5 = computeMd5OrNull(access.path());
+            }
             if (md5 != null) {
                 VideoInfo videoInfo = upsertWithMd5Lock(uploadTask, sourceUrl, md5);
                 fileStorageService.deleteChunks(uploadTask.getUploadId());

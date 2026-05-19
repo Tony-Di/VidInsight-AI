@@ -1,7 +1,9 @@
 package com.videoinsight.backend.service.impl;
 
 import com.videoinsight.backend.service.FileStorageService;
+import com.videoinsight.backend.service.LocalAccess;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -18,6 +20,7 @@ import java.util.Set;
 import java.util.UUID;
 
 @Service
+@ConditionalOnProperty(name = "app.storage.provider", havingValue = "local", matchIfMissing = true)
 public class LocalFileStorageServiceImpl implements FileStorageService {
 
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(".mp4", ".mov", ".avi", ".mkv", ".webm");
@@ -93,6 +96,31 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
         }
 
         return VIDEO_URL_PREFIX + storedFilename;
+    }
+
+    @Override
+    public String saveAudio(Path file, String filename) {
+        if (file == null || !Files.exists(file)) {
+            throw new IllegalArgumentException("audio file is required");
+        }
+        if (!StringUtils.hasText(filename)) {
+            throw new IllegalArgumentException("audio filename is required");
+        }
+
+        Path audioRootPath = Path.of(audioDir).toAbsolutePath().normalize();
+        Path targetPath = audioRootPath.resolve(filename).normalize();
+        if (!targetPath.startsWith(audioRootPath)) {
+            throw new IllegalArgumentException("invalid audio path");
+        }
+
+        try {
+            Files.createDirectories(audioRootPath);
+            Files.copy(file, targetPath, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException exception) {
+            throw new IllegalStateException("failed to save audio file", exception);
+        }
+
+        return AUDIO_URL_PREFIX + filename;
     }
 
     @Override
@@ -209,7 +237,18 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
     }
 
     @Override
-    public Path resolveLocalPath(String sourceUrl) {
+    public LocalAccess accessLocal(String sourceUrl) {
+        return LocalAccess.wrap(resolveLocalPath(sourceUrl));
+    }
+
+    @Override
+    public String publicUrl(String sourceUrl) {
+        // Local storage: the static resource handler in CorsConfig serves /uploads/** directly,
+        // so the internal URL doubles as the playback URL.
+        return sourceUrl;
+    }
+
+    private Path resolveLocalPath(String sourceUrl) {
         if (sourceUrl == null) {
             throw new IllegalArgumentException("sourceUrl is required");
         }

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.videoinsight.backend.config.SiliconFlowProperties;
 import com.videoinsight.backend.service.FileStorageService;
+import com.videoinsight.backend.service.LocalAccess;
 import com.videoinsight.backend.service.SpeechRecognitionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -40,10 +41,10 @@ public class SiliconFlowSpeechRecognitionServiceImpl implements SpeechRecognitio
             throw new IllegalStateException("SILICONFLOW_API_KEY is not configured");
         }
 
-        Path audioPath = fileStorageService.resolveLocalPath(audioUrl);
         String boundary = "----VidInsightBoundary" + UUID.randomUUID();
 
-        try {
+        try (LocalAccess access = fileStorageService.accessLocal(audioUrl)) {
+            Path audioPath = access.path();
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(siliconFlowProperties.getBaseUrl() + "/audio/transcriptions"))
                     .timeout(Duration.ofMinutes(10))

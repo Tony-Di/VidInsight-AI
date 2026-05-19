@@ -5,6 +5,7 @@ import com.videoinsight.backend.enums.VideoStatus;
 import com.videoinsight.backend.mapper.VideoInfoMapper;
 import com.videoinsight.backend.model.response.VideoAnalysisResult;
 import com.videoinsight.backend.service.AiSummaryService;
+import com.videoinsight.backend.service.FileStorageService;
 import com.videoinsight.backend.service.MediaProcessingService;
 import com.videoinsight.backend.service.SpeechRecognitionService;
 import com.videoinsight.backend.service.VideoAnalysisJobService;
@@ -33,6 +34,8 @@ public class VideoAnalysisJobServiceImpl implements VideoAnalysisJobService {
     private final VideoCacheService videoCacheService;
 
     private final VideoStatusPushService videoStatusPushService;
+
+    private final FileStorageService fileStorageService;
 
     @Override
     public void executeAnalysis(Long videoId) {
@@ -67,7 +70,8 @@ public class VideoAnalysisJobServiceImpl implements VideoAnalysisJobService {
             videoCacheService.evictDetail(videoId);
             videoCacheService.evictUserLists(videoInfo.getUserId());
             videoStatusPushService.push(videoInfo.getUserId(),
-                    new VideoStatusPush(videoId, VideoStatus.COMPLETED.name(), audioUrl, null));
+                    new VideoStatusPush(videoId, VideoStatus.COMPLETED.name(),
+                            fileStorageService.publicUrl(audioUrl), null));
         } catch (Exception exception) {
             log.error("Video analysis failed, videoId={}", videoId, exception);
             videoInfo.setVideoStatus(VideoStatus.FAILED);

@@ -8,6 +8,7 @@ import com.videoinsight.backend.model.request.VideoImportRequest;
 import com.videoinsight.backend.ratelimit.RateLimit;
 import com.videoinsight.backend.service.VideoInfoService;
 import com.videoinsight.backend.service.VideoImportService;
+import com.videoinsight.backend.service.VideoResponseEnricher;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -35,24 +36,26 @@ public class VideoInfoController {
 
     private final VideoImportService videoImportService;
 
+    private final VideoResponseEnricher videoResponseEnricher;
+
     @PostMapping
     @Operation(summary = "Create video record by URL", description = "Creates a video record from an external video URL without downloading it.")
     public ApiResponse<VideoInfo> createVideo(@Valid @RequestBody VideoCreateRequest request) {
-        return ApiResponse.success(videoInfoService.createVideo(request));
+        return ApiResponse.success(videoResponseEnricher.enrich(videoInfoService.createVideo(request)));
     }
 
     @PostMapping("/import-url")
     @Operation(summary = "Import video from URL", description = "Creates an IMPORTING record and downloads the URL to local storage in the background.")
     @RateLimit(key = "video.import", capacity = 5, refillPerMinute = 5)
     public ApiResponse<VideoInfo> importVideo(@Valid @RequestBody VideoImportRequest request) {
-        return ApiResponse.success(videoImportService.importVideo(request));
+        return ApiResponse.success(videoResponseEnricher.enrich(videoImportService.importVideo(request)));
     }
 
     @PostMapping("/{id}/retry-import")
     @Operation(summary = "Retry failed import", description = "Re-submits an IMPORT_FAILED video using its original source URL.")
     @RateLimit(key = "video.import", capacity = 5, refillPerMinute = 5)
     public ApiResponse<VideoInfo> retryImport(@Parameter(description = "Video id") @PathVariable Long id) {
-        return ApiResponse.success(videoImportService.retryImport(id));
+        return ApiResponse.success(videoResponseEnricher.enrich(videoImportService.retryImport(id)));
     }
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -60,7 +63,7 @@ public class VideoInfoController {
     @RateLimit(key = "video.upload", capacity = 10, refillPerMinute = 10)
     public ApiResponse<VideoInfo> uploadVideo(@Parameter(description = "Local video file") @RequestPart("file") MultipartFile file,
                                               @Parameter(description = "Optional video title") @RequestParam(value = "title", required = false) String title) {
-        return ApiResponse.success(videoInfoService.uploadVideo(file, title));
+        return ApiResponse.success(videoResponseEnricher.enrich(videoInfoService.uploadVideo(file, title)));
     }
 
     @GetMapping
@@ -68,20 +71,20 @@ public class VideoInfoController {
     public ApiResponse<PageResult<VideoInfo>> listVideos(
             @Parameter(description = "Page number, 1-based") @RequestParam(defaultValue = "1") int page,
             @Parameter(description = "Page size") @RequestParam(defaultValue = "10") int pageSize) {
-        return ApiResponse.success(videoInfoService.listVideos(page, pageSize));
+        return ApiResponse.success(videoResponseEnricher.enrich(videoInfoService.listVideos(page, pageSize)));
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Get video detail", description = "Returns one video record by id.")
     public ApiResponse<VideoInfo> getVideoDetail(@Parameter(description = "Video id") @PathVariable Long id) {
-        return ApiResponse.success(videoInfoService.getVideoDetail(id));
+        return ApiResponse.success(videoResponseEnricher.enrich(videoInfoService.getVideoDetail(id)));
     }
 
     @PostMapping("/{id}/analyze")
     @Operation(summary = "Submit video analysis task", description = "Marks the video as PROCESSING and submits the analysis task to a background thread pool.")
     @RateLimit(key = "video.analyze", capacity = 5, refillPerMinute = 5)
     public ApiResponse<VideoInfo> analyzeVideo(@Parameter(description = "Video id") @PathVariable Long id) {
-        return ApiResponse.success(videoInfoService.analyzeVideo(id));
+        return ApiResponse.success(videoResponseEnricher.enrich(videoInfoService.analyzeVideo(id)));
     }
 
     @DeleteMapping("/{id}")

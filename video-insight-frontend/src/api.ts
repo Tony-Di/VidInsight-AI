@@ -11,7 +11,11 @@ export interface VideoInfo {
   id: number;
   title: string;
   sourceUrl: string;
+  /** Browser-playable URL (presigned for S3/MinIO, same as sourceUrl for local storage). */
+  playUrl?: string;
   audioUrl?: string;
+  /** Browser-playable audio URL (presigned for S3/MinIO, same as audioUrl for local storage). */
+  audioPlayUrl?: string;
   transcript?: string;
   videoStatus: VideoStatus;
   summary?: string;

@@ -9,6 +9,7 @@ import com.videoinsight.backend.mapper.VideoInfoMapper;
 import com.videoinsight.backend.model.request.VideoCreateRequest;
 import com.videoinsight.backend.security.SecurityUtil;
 import com.videoinsight.backend.service.FileStorageService;
+import com.videoinsight.backend.service.LocalAccess;
 import com.videoinsight.backend.service.VideoAnalysisTaskService;
 import com.videoinsight.backend.service.VideoCacheService;
 import com.videoinsight.backend.service.VideoInfoService;
@@ -59,7 +60,10 @@ public class VideoInfoServiceImpl extends ServiceImpl<VideoInfoMapper, VideoInfo
         String videoTitle = StringUtils.hasText(title) ? title : file.getOriginalFilename();
 
         // MD5 去重(仅当前用户范围内,避免跨用户泄漏私有 transcript/summary)
-        String md5 = computeMd5OrNull(fileStorageService.resolveLocalPath(sourceUrl));
+        String md5;
+        try (LocalAccess access = fileStorageService.accessLocal(sourceUrl)) {
+            md5 = computeMd5OrNull(access.path());
+        }
         if (md5 != null) {
             VideoInfo existing = getBaseMapper().findCompletedByMd5AndUser(md5, userId);
             if (existing != null) {
