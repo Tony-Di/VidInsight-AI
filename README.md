@@ -32,6 +32,11 @@
 
 ## Preview
 
+### Demo
+End-to-end flow: paste a YouTube URL → realtime three-phase pipeline → AI summary.
+
+![VidInsight AI Demo](docs/images/demo.gif)
+
 ### Landing Page
 Marketing hero — login / register entry with JWT-based auth.
 

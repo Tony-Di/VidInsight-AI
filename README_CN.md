@@ -32,6 +32,11 @@
 
 ## 项目预览
 
+### 演示
+完整流程：粘贴 YouTube 链接 → 三阶段实时进度 → AI 摘要输出。
+
+![VidInsight AI 演示](docs/images/demo.gif)
+
 ### 首页
 营销主页 — 登录 / 注册入口，JWT 鉴权。
 
