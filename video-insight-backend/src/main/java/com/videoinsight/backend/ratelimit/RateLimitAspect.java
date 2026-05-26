@@ -7,7 +7,7 @@ import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.scripting.support.ResourceScriptSource;
@@ -27,10 +27,14 @@ public class RateLimitAspect {
 
     private static final String KEY_PREFIX = "vidinsight:ratelimit:";
 
-    private final RedisTemplate<String, Object> redisTemplate;
+    // 必须用 StringRedisTemplate:它的 key/value 序列化器都是 StringRedisSerializer，
+    // 传给 Lua 的 ARGV 保持原始字符串("5")。若用配置了 GenericJackson2JsonRedisSerializer
+    // 的 RedisTemplate，参数会被 JSON 序列化成带引号的 "\"5\""，Lua 里 tonumber() 返回 nil，
+    // 脚本报错 → aspect 走 fail-open → 限流静默失效。
+    private final StringRedisTemplate redisTemplate;
     private final RedisScript<Long> tokenBucketScript;
 
-    public RateLimitAspect(RedisTemplate<String, Object> redisTemplate) {
+    public RateLimitAspect(StringRedisTemplate redisTemplate) {
         this.redisTemplate = redisTemplate;
         DefaultRedisScript<Long> s = new DefaultRedisScript<>();
         s.setScriptSource(new ResourceScriptSource(new ClassPathResource("lua/token_bucket.lua")));
