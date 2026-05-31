@@ -1253,7 +1253,7 @@ function AppInner({ user, onLogout }: AppInnerProps) {
                 : t('source_web');
               const staggerIdx = Math.min(idx + 2, 6);
               const stepKey = processingSteps[video.id];
-              const stage = (stepKey && STEP_STAGE[stepKey]) ?? STAGES[0];
+              const stage = (stepKey ? STEP_STAGE[stepKey] : undefined) ?? STAGES[0];
 
               return (
                 <article
