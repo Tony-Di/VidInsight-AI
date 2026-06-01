@@ -22,13 +22,13 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
-      - name: Build
-        # NOTE: tests are skipped for now because the only test (contextLoads)
-        # boots the full Spring context, which eagerly connects to Redis /
-        # RabbitMQ / MySQL. Once Testcontainers-based tests land, drop -DskipTests.
+      - name: Build & test
+        # Runs the Testcontainers *IT integration tests via Failsafe (`verify`
+        # phase). The ubuntu-latest runner ships Docker, so the Redis + MySQL
+        # containers start with no extra CI setup.
         run: |
           chmod +x mvnw
-          ./mvnw -B -ntp clean package -DskipTests
+          ./mvnw -B -ntp clean verify
 
   # ---------- Frontend: React + Vite ----------
   frontend:
