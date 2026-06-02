@@ -14,6 +14,8 @@ import com.videoinsight.backend.websocket.VideoStatusPush;
 import com.videoinsight.backend.websocket.VideoStatusPushService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -37,51 +39,70 @@ public class VideoAnalysisJobServiceImpl implements VideoAnalysisJobService {
 
     private final FileStorageService fileStorageService;
 
+    private final RedissonClient redissonClient;
+
+    private static final String ANALYSIS_LOCK_PREFIX = "vidinsight:lock:analysis:";
+
     @Override
     public void executeAnalysis(Long videoId) {
-        VideoInfo videoInfo = videoInfoMapper.selectById(videoId);
-        if (videoInfo == null) {
-            log.warn("Video analysis skipped because video {} does not exist.", videoId);
-            return;
-        }
-
-        // 幂等保护：已完成的任务不重复执行（防止 MQ 重投导致重复分析）
-        if (videoInfo.getVideoStatus() == VideoStatus.COMPLETED) {
-            log.info("Video {} already completed, skipping duplicate MQ delivery.", videoId);
+        RLock lock = redissonClient.getLock(ANALYSIS_LOCK_PREFIX + videoId);
+        // waitTime=0：抢不到说明已有 worker 在处理本视频，直接跳过（正常返回 → ACK，消息不重投）。
+        // 不传 leaseTime → Redisson WatchDog 自动续租（默认锁 30s，每 10s 续一次），跑多久续多久；
+        // worker 进程崩溃则 WatchDog 停止续租，锁最多 30s 后过期，重投的消息可被另一个 worker 重新领取恢复。
+        if (!lock.tryLock()) {
+            log.info("Video {} 正被其他 worker 处理，跳过本次 MQ 投递。", videoId);
             return;
         }
 
         try {
-            pushStep(videoInfo, "EXTRACTING");
-            String audioUrl = mediaProcessingService.extractAudio(videoInfo);
-            videoInfo.setAudioUrl(audioUrl);
+            VideoInfo videoInfo = videoInfoMapper.selectById(videoId);
+            if (videoInfo == null) {
+                log.warn("Video analysis skipped because video {} does not exist.", videoId);
+                return;
+            }
 
-            pushStep(videoInfo, "TRANSCRIBING");
-            String transcript = speechRecognitionService.transcribe(audioUrl);
-            videoInfo.setTranscript(transcript);
+            // 幂等保护：已完成的任务不重复执行（防止 MQ 重投导致重复分析）
+            if (videoInfo.getVideoStatus() == VideoStatus.COMPLETED) {
+                log.info("Video {} already completed, skipping duplicate MQ delivery.", videoId);
+                return;
+            }
 
-            pushStep(videoInfo, "SUMMARIZING");
-            String summary = aiSummaryService.summarize(transcript);
+            try {
+                pushStep(videoInfo, "EXTRACTING");
+                String audioUrl = mediaProcessingService.extractAudio(videoInfo);
+                videoInfo.setAudioUrl(audioUrl);
 
-            videoInfo.setVideoStatus(VideoStatus.COMPLETED);
-            videoInfo.setSummary(summary);
-            videoInfo.setUpdatedAt(LocalDateTime.now());
-            videoInfoMapper.updateById(videoInfo);
-            videoCacheService.evictDetail(videoId);
-            videoCacheService.evictUserLists(videoInfo.getUserId());
-            videoStatusPushService.push(videoInfo.getUserId(),
-                    new VideoStatusPush(videoId, VideoStatus.COMPLETED.name(),
-                            fileStorageService.publicUrl(audioUrl), null));
-        } catch (Exception exception) {
-            log.error("Video analysis failed, videoId={}", videoId, exception);
-            videoInfo.setVideoStatus(VideoStatus.FAILED);
-            videoInfo.setSummary(getRootCauseMessage(exception));
-            videoInfo.setUpdatedAt(LocalDateTime.now());
-            videoInfoMapper.updateById(videoInfo);
-            videoCacheService.evictDetail(videoId);
-            videoCacheService.evictUserLists(videoInfo.getUserId());
-            videoStatusPushService.push(videoInfo.getUserId(),
-                    new VideoStatusPush(videoId, VideoStatus.FAILED.name(), null, null));
+                pushStep(videoInfo, "TRANSCRIBING");
+                String transcript = speechRecognitionService.transcribe(audioUrl);
+                videoInfo.setTranscript(transcript);
+
+                pushStep(videoInfo, "SUMMARIZING");
+                String summary = aiSummaryService.summarize(transcript);
+
+                videoInfo.setVideoStatus(VideoStatus.COMPLETED);
+                videoInfo.setSummary(summary);
+                videoInfo.setUpdatedAt(LocalDateTime.now());
+                videoInfoMapper.updateById(videoInfo);
+                videoCacheService.evictDetail(videoId);
+                videoCacheService.evictUserLists(videoInfo.getUserId());
+                videoStatusPushService.push(videoInfo.getUserId(),
+                        new VideoStatusPush(videoId, VideoStatus.COMPLETED.name(),
+                                fileStorageService.publicUrl(audioUrl), null));
+            } catch (Exception exception) {
+                log.error("Video analysis failed, videoId={}", videoId, exception);
+                videoInfo.setVideoStatus(VideoStatus.FAILED);
+                videoInfo.setSummary(getRootCauseMessage(exception));
+                videoInfo.setUpdatedAt(LocalDateTime.now());
+                videoInfoMapper.updateById(videoInfo);
+                videoCacheService.evictDetail(videoId);
+                videoCacheService.evictUserLists(videoInfo.getUserId());
+                videoStatusPushService.push(videoInfo.getUserId(),
+                        new VideoStatusPush(videoId, VideoStatus.FAILED.name(), null, null));
+            }
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
         }
     }
 
