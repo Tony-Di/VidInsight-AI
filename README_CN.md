@@ -99,6 +99,7 @@ DeepSeek-V4-Flash 生成的结构化总结。
 | **数据库** | MySQL 8 |
 | **缓存 / 分布式锁** | Redis · Lettuce · Redisson RLock |
 | **消息队列** | RabbitMQ（DLQ + 幂等消费者）|
+| **对象存储** | MinIO（S3 兼容）· AWS SDK for Java v2 · presigned URL 播放 |
 | **AI 接口** | 硅基流动 ASR（`FunAudioLLM/SenseVoiceSmall`）· DeepSeek（`DeepSeek-V4-Flash`）|
 | **媒体工具** | ffmpeg（音频提取）· yt-dlp（视频下载）|
 
@@ -140,10 +141,19 @@ flowchart TD
         W4[写库 COMPLETED\n失效缓存]
     end
 
+    subgraph Storage["对象存储 (MinIO / S3)"]
+        S3["视频 / 音频文件\npresigned URL 播放"]
+    end
+
     U1 --> RL --> CH --> MD5
     U2 --> RL --> IM --> MD5
     MD5 -- 新文件 --> MQ_SEND --> Q
     MD5 -- 重复 --> PUSH
+
+    CH -- 合并后上传 --> S3
+    IM -- 下载后上传 --> S3
+    S3 -- 拉取源视频 --> W1
+    W1 -- 写回 MP3 --> S3
 
     Q --> W1 --> W2 --> W3 --> W4
     DLQ -. 死信 .-> DLQ
@@ -166,10 +176,11 @@ flowchart TD
 | 组件 | 版本 | 说明 |
 |------|------|------|
 | **JDK** | 21 | Spring Boot 3.5 要求 |
-| **Node** | 18+ | 前端构建 |
+| **Node** | 20.19+ / 22.12+ | 前端构建（Vite 7 要求） |
 | **MySQL** | 8.x | Docker 镜像 `mysql:8.4` |
 | **Redis** | 7.x | Docker 镜像 `redis:7-alpine` |
 | **RabbitMQ** | 3.x | Docker 镜像 `rabbitmq:3-management` |
+| **MinIO** | 最新版 | Docker 镜像 `minio/minio`，S3 兼容对象存储，控制台 `:9001`（minioadmin/minioadmin） |
 | **ffmpeg** | 最新版 | 在 PATH 中或通过 `FFMPEG_PATH` 环境变量指定 |
 | **yt-dlp** | 最新版 | 在 PATH 中或通过 `YT_DLP_PATH` 环境变量指定；建议定期更新 |
 | **硅基流动** | — | 有免费额度；需设置 `SILICONFLOW_API_KEY` |
@@ -181,9 +192,11 @@ flowchart TD
 ### 1. 启动中间件（Docker Compose）
 
 ```bash
-# 在项目根目录执行，一键启动 MySQL、Redis、RabbitMQ
-docker-compose up -d
+# 在项目根目录执行，一键启动 MySQL、Redis、RabbitMQ、MinIO
+docker compose up -d   # 旧版 Docker 使用 docker-compose up -d
 ```
+
+> MySQL 首次启动会自动执行 `docker/mysql/init/01_schema.sql` 建表；MinIO 的存储桶由后端启动时自动创建，无需手动配置。
 
 ### 2. 配置环境变量
 
