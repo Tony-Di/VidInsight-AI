@@ -4,6 +4,7 @@ uploads/
 CLAUDE.md
 ROADMAP.md
 PROJECT_FLOW.md
+docs/superpowers/
 
 # --- Secrets / local env ---
 .env
