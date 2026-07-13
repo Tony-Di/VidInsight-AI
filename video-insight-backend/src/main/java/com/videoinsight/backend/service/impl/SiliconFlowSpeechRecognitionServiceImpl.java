@@ -37,14 +37,19 @@ public class SiliconFlowSpeechRecognitionServiceImpl implements SpeechRecognitio
 
     @Override
     public String transcribe(String audioUrl) {
+        try (LocalAccess access = fileStorageService.accessLocal(audioUrl)) {
+            return transcribeFile(access.path());
+        }
+    }
+
+    @Override
+    public String transcribeFile(Path audioPath) {
         if (!StringUtils.hasText(siliconFlowProperties.getApiKey())) {
             throw new IllegalStateException("SILICONFLOW_API_KEY is not configured");
         }
 
         String boundary = "----VidInsightBoundary" + UUID.randomUUID();
-
-        try (LocalAccess access = fileStorageService.accessLocal(audioUrl)) {
-            Path audioPath = access.path();
+        try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(siliconFlowProperties.getBaseUrl() + "/audio/transcriptions"))
                     .timeout(Duration.ofMinutes(10))

@@ -23,4 +23,17 @@ public class AsyncConfig {
         executor.initialize();
         return executor;
     }
+
+    /** Agent 构建上下文时 ASR / OCR 双分支并行用。CallerRunsPolicy:满了就在提交线程跑,不丢任务。 */
+    @Bean("agentBranchExecutor")
+    public Executor agentBranchExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(2);
+        executor.setQueueCapacity(8);
+        executor.setThreadNamePrefix("agent-branch-");
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.initialize();
+        return executor;
+    }
 }
