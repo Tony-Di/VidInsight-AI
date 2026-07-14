@@ -28,12 +28,13 @@ import {
   type VideoInfo,
   type VideoStatus,
 } from './api';
+import AgentPanel from './AgentPanel';
 import Auth from './Auth';
 
 const PAGE_SIZE = 10;
 
 type Page = 'home' | 'workbench';
-type DetailTab = 'transcript' | 'summary' | 'video';
+type DetailTab = 'transcript' | 'summary' | 'video' | 'agent';
 type Lang = 'zh' | 'en';
 type Source = 'file' | 'url';
 type StatusTone = 'ok' | 'warn' | 'err' | 'neutral' | 'accent';
@@ -120,6 +121,20 @@ const TRANSLATIONS = {
     modal_transcript_empty: '分析完成后文字内容将显示在这里',
     modal_summary_processing: 'AI 正在生成总结…',
     modal_summary_empty: '分析完成后 AI 总结将显示在这里',
+    modal_tab_agent: 'AI 问答',
+    agent_goal_placeholder: '输入分析目标,例如:整理本视频的全部知识点并标注时间',
+    agent_ask: '提问',
+    agent_asking: '提交中…',
+    agent_history: '历史提问',
+    agent_plan: '执行计划',
+    agent_conclusions: '结论',
+    agent_evidence: '时间戳证据',
+    agent_suggestions: '建议',
+    agent_passed: '证据校验通过',
+    agent_reserved: '结果有保留',
+    agent_failed: '分析失败',
+    agent_empty: '对这个视频提出你的第一个问题吧',
+    agent_processing: 'Agent 正在分析(首次提问需构建视频上下文,可能较慢)…',
     pagination_prev: '上一页',
     pagination_next: '下一页',
     footer: '© 2026 VidInsight',
@@ -208,6 +223,20 @@ const TRANSLATIONS = {
     modal_transcript_empty: 'Transcript will appear here after analysis',
     modal_summary_processing: 'AI is generating the summary…',
     modal_summary_empty: 'AI summary will appear here after analysis',
+    modal_tab_agent: 'AI Q&A',
+    agent_goal_placeholder: 'Enter an analysis goal, e.g. list all key points with timestamps',
+    agent_ask: 'Ask',
+    agent_asking: 'Submitting…',
+    agent_history: 'History',
+    agent_plan: 'Plan',
+    agent_conclusions: 'Conclusions',
+    agent_evidence: 'Timestamped evidence',
+    agent_suggestions: 'Suggestions',
+    agent_passed: 'Evidence verified',
+    agent_reserved: 'With reservations',
+    agent_failed: 'Analysis failed',
+    agent_empty: 'Ask your first question about this video',
+    agent_processing: 'Agent is analyzing (first question builds the video context, may take a while)…',
     pagination_prev: 'Prev',
     pagination_next: 'Next',
     footer: '© 2026 VidInsight',
@@ -1417,6 +1446,13 @@ function AppInner({ user, onLogout }: AppInnerProps) {
               >
                 <IconSpark size={14} /> {t('modal_tab_summary')}
               </button>
+              <button
+                className={`vi-modal-tab ${detailTab === 'agent' ? 'vi-tab-active' : ''}`}
+                onClick={() => setDetailTab('agent')}
+                disabled={activeVideo.videoStatus !== 'COMPLETED'}
+              >
+                <IconSpark size={14} /> {t('modal_tab_agent')}
+              </button>
             </div>
 
             <div className="vi-modal-body">
@@ -1446,6 +1482,25 @@ function AppInner({ user, onLogout }: AppInnerProps) {
                     )}
                   </div>
                 )
+              ) : detailTab === 'agent' ? (
+                <AgentPanel
+                  videoId={activeVideo.id}
+                  labels={{
+                    goalPlaceholder: t('agent_goal_placeholder'),
+                    ask: t('agent_ask'),
+                    asking: t('agent_asking'),
+                    history: t('agent_history'),
+                    plan: t('agent_plan'),
+                    conclusions: t('agent_conclusions'),
+                    evidence: t('agent_evidence'),
+                    suggestions: t('agent_suggestions'),
+                    passed: t('agent_passed'),
+                    reserved: t('agent_reserved'),
+                    failed: t('agent_failed'),
+                    empty: t('agent_empty'),
+                    processing: t('agent_processing'),
+                  }}
+                />
               ) : activeVideo.summary ? (
                 <div className="vi-modal-markdown">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>

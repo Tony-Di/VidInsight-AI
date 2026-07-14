@@ -233,3 +233,63 @@ export async function retryImport(id: number): Promise<VideoInfo> {
     method: 'POST',
   });
 }
+
+// ── Video Agent ──────────────────────────────────────────────
+
+export type AgentTaskStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+
+export interface AgentEvidence {
+  timestampMs: number;
+  source: string;
+  content: string;
+}
+
+export interface AgentPlan {
+  understoodGoal: string;
+  tasks: string[];
+}
+
+export interface AgentAnswer {
+  title: string;
+  conclusions: string[];
+  evidence: AgentEvidence[];
+  suggestions: string[];
+}
+
+export interface CriticVerdict {
+  passed: boolean;
+  feedback: string[];
+  missingRequirements: string[];
+  unsupportedClaims: string[];
+  requiredTimestamps: number[];
+}
+
+export interface AgentTask {
+  id: number;
+  videoId: number;
+  goal: string;
+  status: AgentTaskStatus;
+  roundCount?: number;
+  plan?: AgentPlan;
+  answer?: AgentAnswer;
+  critic?: CriticVerdict;
+  errorMessage?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export async function createAgentAnalysis(videoId: number, goal: string): Promise<AgentTask> {
+  return request<AgentTask>(`/api/videos/${videoId}/agent-analyses`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ goal }),
+  });
+}
+
+export async function getAgentAnalysis(taskId: number): Promise<AgentTask> {
+  return request<AgentTask>(`/api/agent-analyses/${taskId}`);
+}
+
+export async function listAgentAnalyses(videoId: number): Promise<AgentTask[]> {
+  return request<AgentTask[]>(`/api/videos/${videoId}/agent-analyses`);
+}
