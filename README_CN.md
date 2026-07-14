@@ -176,7 +176,9 @@ flowchart TD
     subgraph Client["浏览器 (React 19)"]
         U1[拖拽/分片上传]
         U2[粘贴 YouTube URL]
+        U3[向 Agent 提问]
         WS[STOMP WebSocket 订阅]
+        POLL[Agent 任务轮询 · 2.5 秒]
     end
 
     subgraph API["Spring Boot API"]
@@ -184,6 +186,7 @@ flowchart TD
         CH[分片上传\n5 MB 分片 · MD5 校验]
         IM[URL 导入\nyt-dlp 下载]
         MD5["MD5 去重\nRedisson RLock\n命中则复用"]
+        AGENT["Agent 问答 API\n同视频同目标 COMPLETED 复用"]
         MQ_SEND[发布消息至 RabbitMQ]
         PUSH["VideoStatusPushService\nSTOMP /topic/status/{userId}"]
     end
@@ -195,6 +198,7 @@ flowchart TD
 
     subgraph Queue["RabbitMQ"]
         Q[video.analysis.v2.queue]
+        AQ["video.agent.queue\n(独立 DLQ，复用 DLX)"]
         DLQ[死信队列 DLQ]
     end
 
@@ -205,19 +209,34 @@ flowchart TD
         W4[写库 COMPLETED\n失效缓存]
     end
 
+    subgraph AgentW["Agent Worker"]
+        A1["VideoContext（懒构建 · 缓存）\n60 秒 ASR ∥ 关键帧 OCR\ndHash 去重"]
+        A2["混合检索\n0.7 余弦 + 0.3 关键词\nBGE-M3 · TopK 3"]
+        A3["Planner → Executor\n→ Critic · ≤ 2 轮"]
+        A4["证据核验\n时间戳 + bigram\n写库 COMPLETED"]
+    end
+
     subgraph Storage["对象存储 (MinIO / S3)"]
         S3["视频 / 音频文件\npresigned URL 播放"]
     end
 
     U1 --> RL --> CH --> MD5
     U2 --> RL --> IM --> MD5
+    U3 --> RL --> AGENT
     MD5 -- 新文件 --> MQ_SEND --> Q
     MD5 -- 重复 --> PUSH
+    AGENT -- 已回答过 --> POLL
+    AGENT -- 新问题 --> AQ
 
     CH -- 合并后上传 --> S3
     IM -- 下载后上传 --> S3
     S3 -- 拉取源视频 --> W1
+    S3 -- 拉取源视频 --> A1
     W1 -- 写回 MP3 --> S3
+
+    AQ -- "锁 (videoId, goalDigest)" --> A1
+    A1 --> A2 --> A3 --> A4
+    A4 -- 终态 --> POLL
 
     Q --> W1 --> W2 --> W3 --> W4
     DLQ -. 死信 .-> DLQ

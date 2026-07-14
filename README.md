@@ -176,7 +176,9 @@ flowchart TD
     subgraph Client["Browser (React 19)"]
         U1[Drag-drop / Chunked Upload]
         U2[Paste YouTube URL]
+        U3[Ask the video agent]
         WS[STOMP WebSocket subscriber]
+        POLL[Agent task polling · 2.5 s]
     end
 
     subgraph API["Spring Boot API"]
@@ -184,6 +186,7 @@ flowchart TD
         CH[Chunked Upload\n5 MB chunks · MD5 verify]
         IM[URL Import\nyt-dlp download]
         MD5["MD5 Dedup\nRedisson RLock\nReuse if duplicate"]
+        AGENT["Agent Q&A API\nreuse COMPLETED (video, goal)"]
         MQ_SEND[Publish to RabbitMQ]
         PUSH["VideoStatusPushService\nSTOMP /topic/status/{userId}"]
     end
@@ -195,6 +198,7 @@ flowchart TD
 
     subgraph Queue["RabbitMQ"]
         Q[video.analysis.v2.queue]
+        AQ["video.agent.queue\n(own DLQ on shared DLX)"]
         DLQ[DLQ]
     end
 
@@ -205,19 +209,34 @@ flowchart TD
         W4[Save COMPLETED\nEvict cache]
     end
 
+    subgraph AgentW["Agent Worker"]
+        A1["VideoContext (lazy, cached)\n60 s ASR ∥ keyframe OCR\ndHash dedup"]
+        A2["Hybrid retrieval\n0.7 cosine + 0.3 keyword\nBGE-M3 · TopK 3"]
+        A3["Planner → Executor\n→ Critic · ≤ 2 rounds"]
+        A4["Evidence verify\ntimestamp + bigram\nsave COMPLETED"]
+    end
+
     subgraph Storage["Object Storage (MinIO / S3)"]
         S3["Video / audio files\npresigned URL playback"]
     end
 
     U1 --> RL --> CH --> MD5
     U2 --> RL --> IM --> MD5
+    U3 --> RL --> AGENT
     MD5 -- new file --> MQ_SEND --> Q
     MD5 -- duplicate --> PUSH
+    AGENT -- already answered --> POLL
+    AGENT -- new goal --> AQ
 
     CH -- upload after merge --> S3
     IM -- upload after download --> S3
     S3 -- fetch source video --> W1
+    S3 -- fetch source video --> A1
     W1 -- write back MP3 --> S3
+
+    AQ -- "lock (videoId, goalDigest)" --> A1
+    A1 --> A2 --> A3 --> A4
+    A4 -- terminal state --> POLL
 
     Q --> W1 --> W2 --> W3 --> W4
     DLQ -. dead letters .-> DLQ
