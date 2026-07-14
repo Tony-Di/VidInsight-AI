@@ -14,6 +14,7 @@ import remarkGfm from 'remark-gfm';
 import {
   analyzeVideo,
   AUTH_REQUIRED_EVENT,
+  cancelAnalysis,
   clearAuth,
   deleteVideo,
   getCurrentUserApi,
@@ -102,7 +103,8 @@ const TRANSLATIONS = {
     msg_delete_confirm_title: '确认删除?',
     msg_delete_confirm_content: '此操作不可撤销,视频文件和分析结果都将被删除。',
     msg_cancel_confirm_title: '确认取消分析?',
-    msg_cancel_confirm_content: '当前分析任务及其视频记录将被移除。',
+    msg_cancel_confirm_content: '重新分析将被取消并保留已有结果;首次分析的视频记录将被移除。',
+    msg_cancel_kept: '已取消,原有分析结果已恢复',
     msg_logout_confirm_title: '退出登录?',
     msg_logout_confirm_content: '退出后需要重新登录才能回到工作台。',
     msg_logout_ok: '退出',
@@ -203,7 +205,8 @@ const TRANSLATIONS = {
       'This cannot be undone. The video file and analysis results will be removed.',
     msg_cancel_confirm_title: 'Cancel this analysis?',
     msg_cancel_confirm_content:
-      'The running analysis task and its video record will be removed.',
+      'A re-analysis is cancelled keeping previous results; a first-time analysis record will be removed.',
+    msg_cancel_kept: 'Cancelled — previous results restored',
     msg_logout_confirm_title: 'Log out?',
     msg_logout_confirm_content:
       "You'll need to sign in again to return to your workbench.",
@@ -798,8 +801,8 @@ function AppInner({ user, onLogout }: AppInnerProps) {
       okButtonProps: { danger: true },
       onOk: async () => {
         try {
-          await deleteVideo(video.id);
-          message.success(t('msg_delete_success'));
+          const kept = await cancelAnalysis(video.id);
+          message.success(kept ? t('msg_cancel_kept') : t('msg_delete_success'));
           await loadVideos(currentPage, true);
         } catch (error) {
           message.error(error instanceof Error ? error.message : t('msg_delete_failed'));

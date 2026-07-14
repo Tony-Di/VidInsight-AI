@@ -19,4 +19,10 @@ public interface VideoInfoService extends IService<VideoInfo> {
     VideoInfo analyzeVideo(Long id);
 
     void deleteVideo(Long id);
+
+    /**
+     * 取消正在进行的分析。已有历史结果(transcript 非空,即重新分析场景)时回退为
+     * COMPLETED 并保留记录,返回该视频;首次分析没有可保留的结果,整条移除并返回 null。
+     */
+    VideoInfo cancelAnalysis(Long id);
 }

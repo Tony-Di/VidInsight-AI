@@ -234,6 +234,16 @@ export async function retryImport(id: number): Promise<VideoInfo> {
   });
 }
 
+/**
+ * 取消进行中的分析。重新分析场景后端回退 COMPLETED 并返回保留的视频;
+ * 首次分析场景后端移除记录并返回 null。
+ */
+export async function cancelAnalysis(id: number): Promise<VideoInfo | null> {
+  return request<VideoInfo | null>(`/api/videos/${id}/cancel-analysis`, {
+    method: 'POST',
+  });
+}
+
 // ── Video Agent ──────────────────────────────────────────────
 
 export type AgentTaskStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
