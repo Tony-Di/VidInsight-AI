@@ -1,10 +1,15 @@
 package com.videoinsight.backend.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.videoinsight.backend.common.PageResult;
+import com.videoinsight.backend.entity.AgentAnalysisTask;
+import com.videoinsight.backend.entity.VideoAgentContext;
 import com.videoinsight.backend.entity.VideoInfo;
 import com.videoinsight.backend.enums.VideoStatus;
 import com.videoinsight.backend.exception.BusinessException;
+import com.videoinsight.backend.mapper.AgentAnalysisTaskMapper;
+import com.videoinsight.backend.mapper.VideoAgentContextMapper;
 import com.videoinsight.backend.mapper.VideoInfoMapper;
 import com.videoinsight.backend.model.request.VideoCreateRequest;
 import com.videoinsight.backend.security.SecurityUtil;
@@ -34,6 +39,10 @@ public class VideoInfoServiceImpl extends ServiceImpl<VideoInfoMapper, VideoInfo
     private final VideoAnalysisTaskService videoAnalysisTaskService;
 
     private final VideoCacheService videoCacheService;
+
+    private final VideoAgentContextMapper videoAgentContextMapper;
+
+    private final AgentAnalysisTaskMapper agentAnalysisTaskMapper;
 
     @Override
     public VideoInfo createVideo(VideoCreateRequest request) {
@@ -151,6 +160,11 @@ public class VideoInfoServiceImpl extends ServiceImpl<VideoInfoMapper, VideoInfo
         String audioUrl = videoInfo.getAudioUrl();
 
         removeById(id);
+        // 级联清理 agent 数据:上下文缓存与问答任务都以 videoId 挂靠,视频没了它们就是孤儿行
+        videoAgentContextMapper.delete(new LambdaQueryWrapper<VideoAgentContext>()
+                .eq(VideoAgentContext::getVideoId, id));
+        agentAnalysisTaskMapper.delete(new LambdaQueryWrapper<AgentAnalysisTask>()
+                .eq(AgentAnalysisTask::getVideoId, id));
         videoCacheService.evictDetail(id);
         videoCacheService.evictUserLists(userId);
 
@@ -175,6 +189,36 @@ public class VideoInfoServiceImpl extends ServiceImpl<VideoInfoMapper, VideoInfo
                 }
             }
         }
+    }
+
+    @Override
+    public VideoInfo cancelAnalysis(Long id) {
+        Long userId = SecurityUtil.currentUserId();
+        VideoInfo videoInfo = getById(id);
+        if (videoInfo == null) {
+            throw new BusinessException(404, "video does not exist");
+        }
+        if (!userId.equals(videoInfo.getUserId())) {
+            throw new BusinessException(403, "you do not own this video");
+        }
+        if (videoInfo.getVideoStatus() != VideoStatus.PROCESSING) {
+            throw new BusinessException(400, "video is not being analyzed");
+        }
+
+        // 重新分析的取消:已有转写说明之前完成过,回退 COMPLETED 保留原结果。
+        // 排队中/进行中的重分析消息会被消费端的 COMPLETED 幂等检查自然跳过。
+        if (StringUtils.hasText(videoInfo.getTranscript())) {
+            videoInfo.setVideoStatus(VideoStatus.COMPLETED);
+            videoInfo.setUpdatedAt(LocalDateTime.now());
+            updateById(videoInfo);
+            videoCacheService.evictDetail(id);
+            videoCacheService.evictUserLists(userId);
+            return videoInfo;
+        }
+
+        // 首次分析的取消:半途而废的记录没有保留价值,沿用原有的整条移除语义。
+        deleteVideo(id);
+        return null;
     }
 
     @Override

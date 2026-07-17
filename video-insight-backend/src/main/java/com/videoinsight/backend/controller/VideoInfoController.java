@@ -87,6 +87,14 @@ public class VideoInfoController {
         return ApiResponse.success(videoResponseEnricher.enrich(videoInfoService.analyzeVideo(id)));
     }
 
+    @PostMapping("/{id}/cancel-analysis")
+    @Operation(summary = "Cancel running analysis",
+            description = "Reverts a re-analysis to COMPLETED keeping previous results; removes the record only when it was a first analysis with nothing to keep. Returns the kept video or null when removed.")
+    public ApiResponse<VideoInfo> cancelAnalysis(@Parameter(description = "Video id") @PathVariable Long id) {
+        VideoInfo kept = videoInfoService.cancelAnalysis(id);
+        return ApiResponse.success(kept == null ? null : videoResponseEnricher.enrich(kept));
+    }
+
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete video", description = "Deletes the video record and the underlying file when no other record references it.")
     public ApiResponse<Void> deleteVideo(@Parameter(description = "Video id") @PathVariable Long id) {

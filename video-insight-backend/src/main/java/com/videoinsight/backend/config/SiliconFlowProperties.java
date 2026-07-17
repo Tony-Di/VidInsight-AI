@@ -14,4 +14,6 @@ public class SiliconFlowProperties {
     private String asrModel;
 
     private String chatModel;
+
+    private String embeddingModel;
 }

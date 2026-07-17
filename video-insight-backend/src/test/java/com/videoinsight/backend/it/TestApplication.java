@@ -2,6 +2,8 @@ package com.videoinsight.backend.it;
 
 import com.videoinsight.backend.VideoInsightBackendApplication;
 import com.videoinsight.backend.config.RabbitMqConfig;
+import com.videoinsight.backend.mq.AgentAnalysisConsumer;
+import com.videoinsight.backend.mq.AgentAnalysisProducer;
 import com.videoinsight.backend.mq.VideoAnalysisConsumer;
 import com.videoinsight.backend.mq.VideoAnalysisProducer;
 import org.mockito.Mockito;
@@ -39,7 +41,9 @@ import org.springframework.context.annotation.FilterType;
                         VideoInsightBackendApplication.class,
                         RabbitMqConfig.class,
                         VideoAnalysisConsumer.class,
-                        VideoAnalysisProducer.class
+                        VideoAnalysisProducer.class,
+                        AgentAnalysisConsumer.class,
+                        AgentAnalysisProducer.class
                 }
         )
 )
@@ -49,5 +53,11 @@ public class TestApplication {
     @Bean
     public VideoAnalysisProducer videoAnalysisProducer() {
         return Mockito.mock(VideoAnalysisProducer.class);
+    }
+
+    /** VideoAgentTaskServiceImpl depends on AgentAnalysisProducer; same no-op mock treatment. */
+    @Bean
+    public AgentAnalysisProducer agentAnalysisProducer() {
+        return Mockito.mock(AgentAnalysisProducer.class);
     }
 }

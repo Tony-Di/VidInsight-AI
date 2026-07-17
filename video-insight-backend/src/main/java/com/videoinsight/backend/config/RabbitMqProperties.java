@@ -18,4 +18,12 @@ public class RabbitMqProperties {
     private String dlq;
 
     private String dlqRoutingKey;
+
+    private String agentQueue;
+
+    private String agentRoutingKey;
+
+    private String agentDlq;
+
+    private String agentDlqRoutingKey;
 }

@@ -26,7 +26,7 @@
 
 ---
 
-**VidInsight AI** 是一个全栈视频智能分析平台，支持本地上传或 YouTube URL 导入，自动提取字幕并生成 AI 总结。系统基于异步管道架构，通过 WebSocket/STOMP 实时推送分析进度，工程上覆盖了生产级常见挑战：分布式去重、缓存一致性、限流防护、断点续传。
+**VidInsight AI** 是一个全栈视频智能分析平台，支持本地上传或 YouTube URL 导入，自动提取字幕并生成 AI 总结。系统基于异步管道架构，通过 WebSocket/STOMP 实时推送分析进度，工程上覆盖了生产级常见挑战：分布式去重、缓存一致性、限流防护、断点续传。每条分析完成的视频还支持**目标驱动的证据约束问答**——由内置多模态 Agent 完成，见 [视频问答 Agent](#视频问答-agent)。
 
 ---
 
@@ -67,6 +67,11 @@ DeepSeek-V4-Flash 生成的结构化总结。
 
 ![AI Summary Tab](docs/images/summary.png)
 
+### 详情弹窗 · AI 问答
+对视频任意提问，返回执行计划、结论与时间戳证据。
+
+![AI Q&A Result](docs/images/agent-result.png)
+
 ---
 
 ## 核心功能
@@ -90,6 +95,65 @@ DeepSeek-V4-Flash 生成的结构化总结。
 
 ---
 
+## 视频问答 Agent
+
+在自动转录与摘要之外，每条分析完成的视频都支持**目标驱动的证据约束问答**：提出任意分析目标（如"整理本视频的全部知识点并标注时间"），返回结构化回答——执行计划、结论、时间戳证据、建议——**每条重要结论都必须有真实存在于视频中的时间戳作为支撑**，点开证据就知道去哪一秒验证。
+
+![AI Q&A Ask](docs/images/agent-ask.png)
+
+### 多模态 VideoContext——懒构建、与目标无关
+
+- 音轨按 **60 秒切片**（ffmpeg）逐段 ASR，每句话都带时间戳——这是证据的原材料
+- **场景检测关键帧**（`scene > 0.35`，另有 30 秒兜底和第 0 帧）交给 **Tesseract OCR**（`chi_sim+eng`），捕捉音频里从不会提到的板书、幻灯片和屏幕文字
+- **dHash 感知指纹**（汉明距离 ≤ 5）在付出 OCR 成本**之前**就丢弃近似重复帧
+- ASR 与 OCR 双分支**并行**执行、按 60 秒窗口合并，单路失败可容忍;合并结果按视频持久化为 JSON——**首次提问时才构建**，没人问的视频不花一分钱
+
+### Planner / Executor / Critic 闭环——最多 2 轮
+
+- **Planner** 把目标拆成 3–5 个子任务 → **Executor** 严格基于检索到的上下文作答 → **Critic** 检查完整性与证据支撑
+- Critic 打回时驱动**一次定向重试**：反馈（包括哪个时间区间缺证据）会回灌到检索里再来一轮
+- **程序化证据核验是最后一道闸**：每条证据的时间戳必须落在真实分段内、内容与转写文本 bigram 相似度 ≥ 0.5。Critic 自己也是 LLM，会跟着一起幻觉——所以最后一关是纯代码，不是又一个模型
+
+### 长视频混合检索——不引向量库
+
+- 长视频按 **5 分钟粒度**切 chunk 并生成 LLM 摘要，用硅基流动 `BAAI/bge-m3` 计算 embedding，随上下文一起持久化
+- 检索得分 = **0.7 × 本地余弦 + 0.3 × 关键词重合**，TopK = 3；embedding 调用失败自动降级为纯关键词，链路永不阻断
+- 有意的取舍：单机单库、TopK = 3 的量级下，本地余弦胜过多运维一个向量数据库;接口已留好，量级上来随时可换
+
+### 任务链路——与主流水线同等的工程标准
+
+```mermaid
+sequenceDiagram
+    participant FE as React（2.5 秒轮询）
+    participant API as REST API
+    participant MQ as RabbitMQ（video.agent.queue）
+    participant W as Agent Worker
+    participant DB as MySQL
+
+    FE->>API: POST /videos/{id}/agent-analyses {goal}
+    API->>DB: 同视频同目标已有 COMPLETED？
+    alt 已回答过
+        API-->>FE: 直接返回旧结果——秒回，不重复扣 AI 费
+    else 新问题
+        API->>DB: 插入 PENDING 任务
+        API->>MQ: 投递 taskId
+        API-->>FE: 返回 PENDING
+        MQ->>W: 消费——Redisson 锁 (videoId, goalDigest)
+        W->>DB: 上下文有缓存？未命中则构建（ASR ∥ OCR）
+        W->>W: 检索 → Planner → (Executor → Critic)×≤2 → 证据核验
+        W->>DB: plan / answer / critique JSON 落库 → COMPLETED
+        FE->>API: GET /agent-analyses/{taskId}（轮询）
+        API-->>FE: 带时间戳证据的结构化回答
+    end
+```
+
+- Agent 任务走**独立队列**，复用现有 exchange 和 DLX——主分析流水线零改动
+- Redisson 锁粒度是 **`(videoId, goalDigest)`**：同一视频的不同问题可并行，同一问题绝不重复执行
+- 重复已完成的问题秒回（实测 **87 ms**，对比冷启动首问约 7 分钟含上下文构建）；同视频的第二个新问题完全跳过上下文构建
+- 处理中途杀掉 worker，重启后 RabbitMQ 重投接着完成——任务永远不会卡死在 `PROCESSING`（DLQ 兜底标 `FAILED`）
+
+---
+
 ## 技术栈
 
 | 分层 | 技术 |
@@ -100,8 +164,8 @@ DeepSeek-V4-Flash 生成的结构化总结。
 | **缓存 / 分布式锁** | Redis · Lettuce · Redisson RLock |
 | **消息队列** | RabbitMQ（DLQ + 幂等消费者）|
 | **对象存储** | MinIO（S3 兼容）· AWS SDK for Java v2 · presigned URL 播放 |
-| **AI 接口** | 硅基流动 ASR（`FunAudioLLM/SenseVoiceSmall`）· DeepSeek（`DeepSeek-V4-Flash`）|
-| **媒体工具** | ffmpeg（音频提取）· yt-dlp（视频下载）|
+| **AI 接口** | 硅基流动 ASR（`FunAudioLLM/SenseVoiceSmall`）· DeepSeek（`DeepSeek-V4-Flash`）· Embedding（`BAAI/bge-m3`）|
+| **媒体工具** | ffmpeg（音频提取 · 场景检测关键帧）· yt-dlp（视频下载）· Tesseract OCR（`chi_sim+eng`）|
 
 ---
 
@@ -112,7 +176,9 @@ flowchart TD
     subgraph Client["浏览器 (React 19)"]
         U1[拖拽/分片上传]
         U2[粘贴 YouTube URL]
+        U3[向 Agent 提问]
         WS[STOMP WebSocket 订阅]
+        POLL[Agent 任务轮询 · 2.5 秒]
     end
 
     subgraph API["Spring Boot API"]
@@ -120,6 +186,7 @@ flowchart TD
         CH[分片上传\n5 MB 分片 · MD5 校验]
         IM[URL 导入\nyt-dlp 下载]
         MD5["MD5 去重\nRedisson RLock\n命中则复用"]
+        AGENT["Agent 问答 API\n同视频同目标 COMPLETED 复用"]
         MQ_SEND[发布消息至 RabbitMQ]
         PUSH["VideoStatusPushService\nSTOMP /topic/status/{userId}"]
     end
@@ -131,6 +198,7 @@ flowchart TD
 
     subgraph Queue["RabbitMQ"]
         Q[video.analysis.v2.queue]
+        AQ["video.agent.queue\n(独立 DLQ，复用 DLX)"]
         DLQ[死信队列 DLQ]
     end
 
@@ -141,19 +209,34 @@ flowchart TD
         W4[写库 COMPLETED\n失效缓存]
     end
 
+    subgraph AgentW["Agent Worker"]
+        A1["VideoContext（懒构建 · 缓存）\n60 秒 ASR ∥ 关键帧 OCR\ndHash 去重"]
+        A2["混合检索\n0.7 余弦 + 0.3 关键词\nBGE-M3 · TopK 3"]
+        A3["Planner → Executor\n→ Critic · ≤ 2 轮"]
+        A4["证据核验\n时间戳 + bigram\n写库 COMPLETED"]
+    end
+
     subgraph Storage["对象存储 (MinIO / S3)"]
         S3["视频 / 音频文件\npresigned URL 播放"]
     end
 
     U1 --> RL --> CH --> MD5
     U2 --> RL --> IM --> MD5
+    U3 --> RL --> AGENT
     MD5 -- 新文件 --> MQ_SEND --> Q
     MD5 -- 重复 --> PUSH
+    AGENT -- 已回答过 --> POLL
+    AGENT -- 新问题 --> AQ
 
     CH -- 合并后上传 --> S3
     IM -- 下载后上传 --> S3
     S3 -- 拉取源视频 --> W1
+    S3 -- 拉取源视频 --> A1
     W1 -- 写回 MP3 --> S3
+
+    AQ -- "锁 (videoId, goalDigest)" --> A1
+    A1 --> A2 --> A3 --> A4
+    A4 -- 终态 --> POLL
 
     Q --> W1 --> W2 --> W3 --> W4
     DLQ -. 死信 .-> DLQ
@@ -183,6 +266,7 @@ flowchart TD
 | **MinIO** | 最新版 | Docker 镜像 `minio/minio`，S3 兼容对象存储，控制台 `:9001`（minioadmin/minioadmin） |
 | **ffmpeg** | 最新版 | 在 PATH 中或通过 `FFMPEG_PATH` 环境变量指定 |
 | **yt-dlp** | 最新版 | 在 PATH 中或通过 `YT_DLP_PATH` 环境变量指定；建议定期更新 |
+| **Tesseract** | 5.x | 视频问答 Agent 的 OCR 分支；需安装 `chi_sim` + `eng` 语言包；在 PATH 中或通过 `TESSERACT_PATH` 指定 |
 | **硅基流动** | — | 有免费额度；需设置 `SILICONFLOW_API_KEY` |
 
 ---
@@ -210,6 +294,9 @@ SILICONFLOW_API_KEY=sk-你的密钥
 FFMPEG_PATH=C:/path/to/ffmpeg.exe
 YT_DLP_PATH=C:/path/to/yt-dlp.exe
 YT_DLP_FFMPEG_LOCATION=C:/path/to/ffmpeg-bin-dir
+
+# 视频问答 Agent（OCR 分支）需要;tesseract 不在 PATH 中则必填
+TESSERACT_PATH=C:/Program Files/Tesseract-OCR/tesseract.exe
 ```
 
 Windows PowerShell 设置方式：

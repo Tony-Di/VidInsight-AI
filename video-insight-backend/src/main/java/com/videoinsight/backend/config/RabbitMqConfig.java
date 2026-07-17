@@ -69,6 +69,35 @@ public class RabbitMqConfig {
                 .with(rabbitMqProperties.getDlqRoutingKey());
     }
 
+    // ── Agent 问答队列(复用主 exchange 与 DLX,只新增队列/绑定) ──
+
+    @Bean
+    public Queue agentAnalysisQueue() {
+        return QueueBuilder.durable(rabbitMqProperties.getAgentQueue())
+                .withArgument("x-dead-letter-exchange", rabbitMqProperties.getDlx())
+                .withArgument("x-dead-letter-routing-key", rabbitMqProperties.getAgentDlqRoutingKey())
+                .build();
+    }
+
+    @Bean
+    public Binding agentAnalysisBinding(Queue agentAnalysisQueue, DirectExchange videoAnalysisExchange) {
+        return BindingBuilder.bind(agentAnalysisQueue)
+                .to(videoAnalysisExchange)
+                .with(rabbitMqProperties.getAgentRoutingKey());
+    }
+
+    @Bean
+    public Queue agentAnalysisDlq() {
+        return QueueBuilder.durable(rabbitMqProperties.getAgentDlq()).build();
+    }
+
+    @Bean
+    public Binding agentAnalysisDlqBinding(Queue agentAnalysisDlq, DirectExchange videoAnalysisDlx) {
+        return BindingBuilder.bind(agentAnalysisDlq)
+                .to(videoAnalysisDlx)
+                .with(rabbitMqProperties.getAgentDlqRoutingKey());
+    }
+
     // ── 公共配置 ────────────────────────────────────────────────
 
     @Bean
